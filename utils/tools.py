@@ -1,29 +1,47 @@
 import random
-from datetime import datetime
+from django.utils import timezone
+from django.db import models
+from utils.snowflake import Snowflake
 
-def primary_key(num_digits):
-    """Generates a primary key string with specified number of digits.
+def generate_account_number():
+    """Generates a 10-digit account number."""
+    current_year_last_two_digits = timezone.now().year % 100
+    account_number = [current_year_last_two_digits // 10, current_year_last_two_digits % 10]
 
-    Args:
-        num_digits: The desired number of digits in the primary key.
-
-    Returns:
-        A string containing the generated primary key.
-
-    Raises:
-        ValueError: If the requested number of digits is less than 1.
-    """
-
-    if num_digits < 1:
-        raise ValueError("Number of digits must be at least 1")
-
-    current_year_last_two_digits = datetime.now().year % 100
-    primary_key = [current_year_last_two_digits]
-
-    for _ in range(num_digits - 2):
+    for _ in range(8):  
         random_digit = random.randint(0, 9)
-        primary_key.append(random_digit)
+        account_number.append(random_digit)
 
-    primary_key_str = "".join(map(str, primary_key))
+    random.shuffle(account_number[2:])  
 
-    return primary_key_str
+    account_number_str = "".join(map(str, account_number))
+
+    return account_number_str
+
+def generate_transaction_id():
+    """Generates a 16-digit transaction id."""
+    current_year_last_two_digits = timezone.now().year % 100
+    transaction_id = [current_year_last_two_digits // 10, current_year_last_two_digits % 10]
+
+    for _ in range(14):  
+        random_digit = random.randint(0, 9)
+        transaction_id.append(random_digit)
+
+    random.shuffle(transaction_id[2:])  
+
+    transaction_id_str = "".join(map(str, transaction_id))
+
+    return transaction_id_str
+
+
+class BaseModel(models.Model):
+    """Base model with id attribute for all models requiring an id"""
+
+    id = models.BigIntegerField(
+        primary_key=True,
+        default=Snowflake(1, 1).generate_id,
+        editable=False,
+    )
+
+    class Meta:
+        abstract = True

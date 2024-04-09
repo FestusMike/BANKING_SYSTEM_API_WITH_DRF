@@ -4,10 +4,16 @@ from sib_api_v3_sdk.rest import ApiException
 import os
 import sib_api_v3_sdk
 
+
 def GenerateOTP(length: int):
-    otp_char = string.digits
-    otp = "".join(random.choice(otp_char) for char in range(length))
-    return otp
+    if length < 1:
+        raise ValueError("Length must be at least 1")
+
+    otp_char = string.digits[1:]
+    first_char = random.choice(string.digits[1:]) 
+    otp = first_char + "".join(random.choice(otp_char) for _ in range(length - 1))
+    return otp[:length]
+
 
 
 def profile_image_path(instance, filename):

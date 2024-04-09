@@ -8,9 +8,7 @@ class CustomUserCreationForm(UserCreationForm):
     class Meta:
         model = User
         fields = (
-            "first_name",
-            "middle_name",
-            "last_name",
+            "full_name",
             "email",
             "phone_number",
             "date_of_birth",
@@ -27,19 +25,19 @@ class CustomUserAdmin(UserAdmin):
             None,
             {
                 "fields": (
-                    "first_name",
-                    "middle_name",
-                    "last_name",
+                    "full_name",
                     "email",
                     "phone_number",
-                    "date_of_birth",
+                    #"date_of_birth",
                     "address",
                     "otp",
                     "profile_picture",
+                    "is_active",
+                    "is_staff",
                 )
             },
         ),
-        ("Important dates", {"fields": ("last_login", "last_logout")}),
+      #  ("Important dates", {"fields": ("last_login", "last_logout")}),
     )
     add_fieldsets = (
         (
@@ -47,29 +45,25 @@ class CustomUserAdmin(UserAdmin):
             {
                 "classes": ("wide",),
                 "fields": (
-                    "first_name",
-                    "middle_name",
-                    "last_name",
+                    "full_name",
                     "email",
                     "address",
                     "otp",
                     "password1",
                     "password2",
+                    "is_active",
                 ),
             },
         ),
     )
     list_display = (
-        "first_name",
-        "last_name",
+        "full_name",
         "email",
         "otp",
-        "date_created",
-        "date_updated",
+        "is_active",
     )
     search_fields = ("email",)
     ordering = ("-date_created",)
 
 
-# Register CustomUserAdmin instead
 admin.site.register(User, CustomUserAdmin)

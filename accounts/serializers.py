@@ -1,31 +1,22 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.files.base import ContentFile
 from filetype import guess
+import re
 
 User = get_user_model()
 
 
 class UserRegistrationSerializer(serializers.Serializer):
-    first_name = serializers.CharField(max_length=150)
-    last_name = serializers.CharField(max_length=150)
+    full_name = serializers.CharField(max_length=150)
     email = serializers.EmailField()
 
-    def validate_first_name(self, value):
-        if not value.isalpha():
+    def validate_full_name(self, value):
+        if not re.match(r'^[a-zA-Z\s]+$', value):
             raise ValidationError(
-                "Only alphabetical characters are allowed for the first name. Special Characters and numerals are not allowed"
-            )
+            "Only alphabetical characters and spaces are allowed for the full name."
+        )
         return value
-
-    def validate_last_name(self, value):
-        if not value.isalpha():
-            raise ValidationError(
-                "Only alphabetical characters are allowed for the last name. Special Characters and numerals are not allowed"
-            )
-        return value
-
 
 class OTPVerificationSerializer(serializers.Serializer):
     otp = serializers.IntegerField()
@@ -86,23 +77,18 @@ class PasswordChangeAuthenticatedSerializer(serializers.Serializer):
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for updating user profile information.
-    """
 
     class Meta:
         model = User
         fields = (
+            "date_of_birth",
             "phone_number",
             "date_of_birth",
             "address",
             "profile_picture",
         )
 
-    def validate_phone_number(self, value):
-        """
-        Custom validation for phone number.
-        """
+    def validate_phone_number(self, value): 
         if not value.startswith("+234") or(value.startswith("+234") and len(value) > 15):
             raise serializers.ValidationError(
                 "Phone number must start with country code +234 and must be 15 characters max."
@@ -110,9 +96,6 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_profile_picture(self, value):
-        """
-        Custom validation for profile picture using filetype module.
-        """
         if not value:
             return value  
 
@@ -127,13 +110,5 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Profile picture must be a JPEG or PNG image")
         return value
 
-    def to_internal_value(self, data):
-        """
-        Override to_internal_value to handle potential ContentFile issues.
-        """
-        profile_picture = data.get('profile_picture')
-        if profile_picture:
-            if not isinstance(profile_picture, ContentFile):
-                data['profile_picture'] = ContentFile(profile_picture.read())
-            return super().to_internal_value(data)
+
     

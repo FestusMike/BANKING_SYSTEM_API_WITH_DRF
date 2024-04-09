@@ -1,4 +1,5 @@
 from .models import User
+from banking.models import Account
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from rest_framework import status
@@ -11,10 +12,13 @@ def send_welcome_email(sender, instance, created, **kwargs):
     This function sends an OTP email to a newly created user.
     If sending the email fails, it deletes the user and adds an error message to the response data.
     """
-    if created and not instance.is_superuser:
+    if created and not (instance.is_staff or instance.is_superuser):
+        Account.objects.create(
+            user=instance, current_balance=0.00, account_type="SAVINGS"
+        )
         subject = "Welcome! Verify your email address."
         message = f"""
-    Hi, {instance.first_name} {instance.last_name}
+    Hi, {instance.full_name} 
 
     Thank you for registering with Longman!
 
@@ -33,9 +37,9 @@ def send_welcome_email(sender, instance, created, **kwargs):
         reply_to_email = os.environ.get("REPLY_TO_EMAIL")
         to = [{
             "email": instance.email,
-            "name": instance.first_name
+            "name": instance.full_name
         }]
-        
+
         sent_email = send_email(
             to=to,
             subject=subject,
@@ -57,10 +61,10 @@ def send_new_otp(sender, instance, created, **kwargs):
     """
     This function resends a new otp if the former one expires.
     """
-    if not created and instance.otp:
+    if not created and (instance.otp and instance.has_sent_another_welcome_otp and not instance.is_active):
         subject = "Verify your email address."
         message = f"""
-    Hi, {instance.first_name} {instance.last_name}
+    Hi, {instance.full_name}
 
     To verify your email address and activate your account, please enter the following OTP:
 
@@ -75,7 +79,7 @@ def send_new_otp(sender, instance, created, **kwargs):
         sender_name = "Longman Technologies"
         sender_email = os.environ.get("EMAIL_SENDER")
         reply_to_email = os.environ.get("REPLY_TO_EMAIL")
-        to = [{"email": instance.email, "name": instance.first_name}]
+        to = [{"email": instance.email, "name": instance.full_name}]
         sent_email = send_email(
             to=to,
             subject=subject,
@@ -93,7 +97,7 @@ def send_password_reset_otp(sender, instance, created, **kwargs):
     if not created and (instance.otp and instance.is_active):
         subject = "Password Reset OTP"
         message = f"""
-    Hi, {instance.first_name} {instance.last_name}
+    Hi, {instance.full_name}
 
     A password reset OTP has been requested for your account.
 
@@ -110,7 +114,7 @@ def send_password_reset_otp(sender, instance, created, **kwargs):
         sender_name = "Longman Technologies"
         sender_email = os.environ.get("EMAIL_SENDER")
         reply_to_email = os.environ.get("REPLY_TO_EMAIL")
-        to = [{"email": instance.email, "name": instance.first_name}]
+        to = [{"email": instance.email, "name": instance.full_name}]
         sent_email = send_email(
         to=to,
         subject=subject,

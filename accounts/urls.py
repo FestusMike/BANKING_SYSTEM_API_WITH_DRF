@@ -14,7 +14,7 @@ from .views import (
 
 urlpatterns = [
     path("register", UserRegistrationAPIView.as_view(), name="user-registration"),
-    path("otp-resend", ResendOTPAPIView.as_view(), name="otp_resend"),
+    path("otp-resend", ResendOTPAPIView.as_view(), name="otp-resend"),
     path("verify-otp", OTPVerificationAPIView.as_view(), name="otp-verification"),
     path("create-password", PasswordSetUpAPIView.as_view(), name="create-password"),
     path("pin/create", TransactionPinCreateAPIView.as_view(), name="pin-create"),
@@ -25,6 +25,6 @@ urlpatterns = [
         PasswordChangeOTPAPIView.as_view(),
         name="password_change_otp",
     ),
-    path("password-reset", PasswordChangeAPIView.as_view(), name="password_reset"),
+    path("password-reset", PasswordChangeAPIView.as_view(), name="password-reset"),
     path("profile", UserProfileUpdateView.as_view(), name="profile-update"),
 ]

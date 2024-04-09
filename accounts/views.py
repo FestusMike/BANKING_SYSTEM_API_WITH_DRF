@@ -6,9 +6,11 @@ from rest_framework import status, generics
 from .utils import GenerateOTP
 from rest_framework.response import Response
 from rest_framework import generics
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from .permissions import IsOwnerOrAdmin
 from .serializers import (
     UserRegistrationSerializer,
     OTPVerificationSerializer,
@@ -50,26 +52,23 @@ class UserRegistrationAPIView(generics.GenericAPIView):
                 status=status.HTTP_406_NOT_ACCEPTABLE,
             )
         otp = GenerateOTP(length=4)
-        first_name = serializer.validated_data["first_name"].capitalize()
-        last_name = serializer.validated_data["last_name"].capitalize()
+        full_name = serializer.validated_data["full_name"]
+        full_name_title = ' '.join(word.capitalize() for word in full_name.split())
         user = User.objects.create_user(
             email=email,
-            first_name=first_name,
-            last_name=last_name,
-            otp=otp
+            full_name=full_name_title,
+            otp=otp,
+            is_active=False
         )
-        #user.otp = otp
-        user.is_active = False
-        user.save()
-     
+        serializer.validated_data["full_name"] = full_name_title
         response_data = {
-                "status": status.HTTP_201_CREATED,
-                "Success": True,
-                "message": f"Enter the 4-digit OTP that has been sent to {email}. Please check your inbox or spam folder.",
-                "data": serializer.validated_data
-                }
+            "status": status.HTTP_201_CREATED,
+            "Success": True,
+            "message": f"Enter the 4-digit OTP that has been sent to {email}. Please check your inbox or spam folder.",
+            "account_number" : user.account_number,
+            "data": serializer.validated_data 
+        }
         return Response(response_data, status=status.HTTP_201_CREATED)
-
 
 class ResendOTPAPIView(generics.GenericAPIView):
     """
@@ -93,6 +92,7 @@ class ResendOTPAPIView(generics.GenericAPIView):
             }
             return Response(response_data, status=status.HTTP_404_NOT_FOUND)
         user.otp = otp
+        user.has_sent_another_welcome_otp = True
         user.save()
 
         response_data = {
@@ -101,7 +101,6 @@ class ResendOTPAPIView(generics.GenericAPIView):
                 "message": f"Enter the 4-digit OTP that has been sent to {email}. Please check your inbox or spam folder.",
             }
         return Response(response_data, status=status.HTTP_200_OK)
-
 
 class OTPVerificationAPIView(generics.GenericAPIView):
     """
@@ -174,7 +173,7 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.password = make_password(serializer.validated_data["password1"])
+        user.set_password(serializer.validated_data["password1"])
         user.otp = None
         user.is_active = True
         user.last_login = timezone.now()
@@ -187,13 +186,12 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
         response_data = {
             "status": status.HTTP_201_CREATED,
             "Success": True,
-            "message": "Password set successfully",
+            "message": "Password set successfully.",
             "access_token": access_token,
             "refresh_token": refresh_token,
         }
 
         return Response(response_data, status=status.HTTP_201_CREATED)
-
 
 class TransactionPinCreateAPIView(generics.GenericAPIView):
     """
@@ -216,24 +214,22 @@ class TransactionPinCreateAPIView(generics.GenericAPIView):
                 {
                     "status": status.HTTP_406_NOT_ACCEPTABLE,
                     "Success": False,
-                    "detail": "PIN must be numeric and in four digits",
+                    "message": "PIN must be numeric and in four digits",
                 },
                 status=status.HTTP_406_NOT_ACCEPTABLE,
             )
 
-        hashed_pin = make_password(pin)
-        user.pin = hashed_pin
+        user.pin = make_password(pin)
         user.save()
 
         return Response(
-            {
-                "status": status.HTTP_201_CREATED,
-                "Success": True,
-                "message": "Transaction PIN created successfully",
-            },
-            status=status.HTTP_201_CREATED,
+                {
+                    "status": status.HTTP_201_CREATED,
+                    "Success": True,
+                    "message": "Transaction PIN created successfully",
+                },
+                status=status.HTTP_201_CREATED,
         )
-
 
 class LoginAPIView(generics.GenericAPIView):
     """
@@ -253,7 +249,7 @@ class LoginAPIView(generics.GenericAPIView):
 
         user = authenticate(request, email=email, password=password)
 
-        if user is not None and user.is_active:
+        if user and user.is_active:
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
@@ -283,10 +279,8 @@ class LoginAPIView(generics.GenericAPIView):
                 "status": status.HTTP_401_UNAUTHORIZED,
                 "Success": False,
                 "message": "Invalid Credentials",
-                "error": serializer.errors,
             }
             return Response(response_data, status=status.HTTP_401_UNAUTHORIZED)
-
 
 class UserLogoutAPIView(generics.GenericAPIView):
     """
@@ -304,6 +298,10 @@ class UserLogoutAPIView(generics.GenericAPIView):
                 raise Exception("Refresh token not provided")
             token = RefreshToken(refresh_token)
             token.blacklist()
+
+            user = request.user
+            user.last_logout = timezone.now()
+            user.save()
             response_data = {
                 "status": status.HTTP_205_RESET_CONTENT,
                 "Success": True,
@@ -317,7 +315,6 @@ class UserLogoutAPIView(generics.GenericAPIView):
                 "message": "Logout not successful",
             }
             return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
-
 
 class PasswordChangeOTPAPIView(generics.GenericAPIView):
     permission_classes = [AllowAny]
@@ -411,18 +408,36 @@ class PasswordChangeAPIView(generics.GenericAPIView):
         user.otp = None
         user.save()
 
-class UserProfileUpdateView(generics.GenericAPIView):
+class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
     """
-  View for updating user profile information.
-  """
-    permission_classes = [IsAuthenticated]
-    serializer_class = UserProfileUpdateSerializer
-    http_method_names = ["patch",]
-    authentication_classes = [JWTAuthentication]
+    View for updating user profile information.
+    """
 
-    def patch(self, request, *args, **kwargs):
-        user = request.user
-        serializer = self.get_serializer(user, data=request.data, partial=True)
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    serializer_class = UserProfileUpdateSerializer
+    authentication_classes = [JWTAuthentication]
+    parser_classes = [FormParser, MultiPartParser]
+
+    def get_object(self):
+        return self.request.user
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        response_data = {
+            "status" : status.HTTP_200_OK,
+            "message" : "Profile Updated Successfully",
+            "data" : serializer.data
+        }
+        return Response(response_data)
+
+    def perform_update(self, serializer):
         serializer.save()
-        return Response(serializer.data)
