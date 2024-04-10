@@ -19,17 +19,18 @@ class AccountAdmin(admin.ModelAdmin):
 class TransactionAdmin(admin.ModelAdmin):
     list_display = (
         "transaction_id",
-        "account",
-        "recipient_account",
+        "from_account",
+        "to_account",
         "transaction_type",
         "amount",
-        "transaction_date",
+        "description",
+        "timestamp",
     )
-    list_filter = ("transaction_type", "transaction_date")
+    list_filter = ("transaction_type", "timestamp")
     search_fields = (
         "transaction_id",
-        "account__account_number",
-        "recipient_account__account_number",
+        "from_account__account_number",
+        "to_account__account_number",
     )
 
 
@@ -37,10 +38,9 @@ class TransactionAdmin(admin.ModelAdmin):
 class LedgerAdmin(admin.ModelAdmin):
     list_display = (
         "transaction",
-        "amount",
-        "debit_credit",
-        "balance",
-        
+        "account",
+        "balance_after_transaction",
+        "timestamp",
     )
-    list_filter = ("debit_credit", "transaction__transaction_date")
+    list_filter = ("account", "timestamp")
     search_fields = ("transaction__transaction_id",)

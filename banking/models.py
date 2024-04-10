@@ -7,10 +7,10 @@ from .constants import ACCOUNT_TYPE, TRANSACTION_TYPE, TRANSACTION_MODE
 
 User = get_user_model()
 
-class Account(BaseModel):
+class Account(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="accounts")
     account_number = models.BigIntegerField(
-        unique=True, editable=False, default=generate_account_number
+        unique=True, primary_key=True, editable=False, default=generate_account_number
     )
     account_type = models.CharField(
         max_length=30, null=False, choices=ACCOUNT_TYPE, default="SAVINGS"
@@ -32,10 +32,7 @@ class Account(BaseModel):
 
 class Transaction(models.Model):
     transaction_id = models.BigIntegerField(
-        unique=True, editable=False, default=generate_transaction_id
-    )
-    account = models.ForeignKey(
-        Account, on_delete=models.DO_NOTHING, related_name="transactions"
+        unique=True, primary_key=True, editable=False, default=generate_transaction_id
     )
     transaction_type = models.CharField(
         max_length=20, choices=TRANSACTION_TYPE, null=False, default="DEBIT"
@@ -46,10 +43,23 @@ class Transaction(models.Model):
         null=False,
         default="MOBILE APP TRANSFER",
     )
+    from_account = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name="outgoing_transactions",
+        null=True,
+        blank=True,
+    )
+    to_account = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name="incoming_transactions",
+        null=True,
+        blank=True,
+    )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    recipient_account = models.ForeignKey(Account,on_delete=models.DO_NOTHING)
     description = models.CharField(max_length=255, null=True, blank=True)
-    transaction_date = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "Transactions"
@@ -61,14 +71,13 @@ class Transaction(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        return f"{self.transaction_id} - {self.account.user.full_name if self.transaction_type == 'DEBIT' else self.recipient_account.user.full_name}"
+        return f"{self.transaction_id} - {self.from_account.user.full_name if self.transaction_type == 'DEBIT' else self.to_account.user.full_name}"
 
 class Ledger(BaseModel):
-    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    description = models.CharField(max_length=255, null=True, blank=True)
-    debit_credit = models.CharField(max_length=10, choices=TRANSACTION_TYPE)
-    balance = models.DecimalField(max_digits=10, decimal_places=2)
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='ledger_entries')
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, related_name='ledger_entries')
+    balance_after_transaction = models.DecimalField(max_digits=12, decimal_places=2)
+    timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "Ledger"
