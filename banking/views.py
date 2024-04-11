@@ -54,12 +54,19 @@ class UserTransactionListView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         user_accounts = user.accounts.all()
-        transactions = Transaction.objects.filter(
-            from_account__in=user_accounts 
-        ) | Transaction.objects.filter(
-            to_account__in=user_accounts
-         )
-        return transactions.order_by('-timestamp')
+
+        debit_transactions = Transaction.objects.filter(
+            from_account__in=user_accounts, transaction_type="DEBIT"
+        )
+
+        credit_transactions = Transaction.objects.filter(
+            to_account__in=user_accounts, transaction_type="CREDIT"
+        )
+
+        transactions = debit_transactions | credit_transactions
+
+        return transactions.order_by("-timestamp")
+
 
 class UserTransactionRetrieveView(generics.RetrieveAPIView):
     serializer_class = TransactionSerializer

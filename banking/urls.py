@@ -10,6 +10,6 @@ urlpatterns = [
         name="user-transaction-detail",
     ),
     path(
-        "statement", StatementOfAccountAPIView.as_view(), name="statement_of_account"
+        "statement", StatementOfAccountAPIView.as_view(), name="statement-of-account"
     ),
 ]

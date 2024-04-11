@@ -3,4 +3,5 @@ db.sqlite3
 commands.sh
 */migrations
 */__pycache__
+junk.json
 
