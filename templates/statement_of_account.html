@@ -1,0 +1,12 @@
+{% extends 'main.html' %}
+
+{% block content %}
+    <h1>Statement of Account</h1>
+    <p>Dear {{ user.full_name }},</p>
+
+    <p>{{ date_range }}</strong></p>
+
+    <p>Please find attached the detailed ledger report from <strong>{{ company_name }}</strong>.</p>
+    <p>Thank you for trusting us with your financial needs.</p>
+    <p>Best Regards,<br/>Longman Technologies</p>
+{% endblock %}

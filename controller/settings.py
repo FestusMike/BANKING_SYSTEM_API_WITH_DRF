@@ -48,8 +48,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "drf_yasg",
-    'cloudinary_storage',
-    'cloudinary',
+    "cloudinary_storage",
+    "cloudinary",
 ]
 
 MIDDLEWARE = [
@@ -67,7 +67,9 @@ ROOT_URLCONF = "controller.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            BASE_DIR / "templates",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -182,11 +184,11 @@ DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 # DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-# EMAIL_HOST = os.environ.get("SMTP_SERVER")
+# EMAIL_HOST = os.getenv("SMTP_SERVER")
 # EMAIL_PORT = 587
 # EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = os.environ.get("LOGIN")
-# EMAIL_HOST_PASSWORD = os.environ.get("SMTP_KEY")
+# EMAIL_HOST_USER = os.getenv("LOGIN")
+# EMAIL_HOST_PASSWORD = os.getenv("SMTP_KEY")
 
 CLOUDINARY_STORAGE = {
     "CLOUD_NAME": os.getenv("CLOUDINARY_NAME"),

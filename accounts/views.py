@@ -65,7 +65,6 @@ class UserRegistrationAPIView(generics.GenericAPIView):
             "status": status.HTTP_201_CREATED,
             "Success": True,
             "message": f"Enter the 4-digit OTP that has been sent to {email}. Please check your inbox or spam folder.",
-            "account_number" : user.account_number,
             "data": serializer.validated_data 
         }
         return Response(response_data, status=status.HTTP_201_CREATED)

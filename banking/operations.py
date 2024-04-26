@@ -29,7 +29,6 @@ def transfer_funds(from_account, to_account_number, amount, description):
                 account=from_account,
                 transaction=debit_transaction,
                 balance_after_transaction=from_account.current_balance,
-                timestamp=debit_transaction.timestamp
             )
 
             credit_transaction = Transaction.objects.create(
@@ -47,7 +46,6 @@ def transfer_funds(from_account, to_account_number, amount, description):
                 account=to_account,
                 transaction=credit_transaction,
                 balance_after_transaction=to_account.current_balance,
-                timestamp=credit_transaction.timestamp
             )
 
     except ObjectDoesNotExist:

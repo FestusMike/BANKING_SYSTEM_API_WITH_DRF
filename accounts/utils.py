@@ -10,19 +10,19 @@ def GenerateOTP(length: int):
         raise ValueError("Length must be at least 1")
 
     otp_char = string.digits[1:]
-    first_char = random.choice(string.digits[1:]) 
+    first_char = random.choice(string.digits[1:])
     otp = first_char + "".join(random.choice(otp_char) for _ in range(length - 1))
     return otp[:length]
-
 
 
 def profile_image_path(instance, filename):
     return f"profiles/{instance.first_name}_{instance.last_name}/{filename}"
 
+
 def send_email(to, reply_to, html_content, sender, subject):
     try:
         configuration = sib_api_v3_sdk.Configuration()
-        configuration.api_key["api-key"] = os.environ.get("EMAIL_API_KEY")
+        configuration.api_key["api-key"] = os.getenv("EMAIL_API_KEY")
         api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
             sib_api_v3_sdk.ApiClient(configuration)
         )

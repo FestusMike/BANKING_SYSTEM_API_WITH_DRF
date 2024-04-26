@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from .models import Transaction
+
 
 
 class IsOwnerOfTransaction(permissions.BasePermission):

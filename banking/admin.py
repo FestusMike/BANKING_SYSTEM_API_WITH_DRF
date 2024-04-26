@@ -40,7 +40,7 @@ class LedgerAdmin(admin.ModelAdmin):
         "transaction",
         "account",
         "balance_after_transaction",
-        "timestamp",
+        
     )
-    list_filter = ("account", "timestamp")
+    list_filter = ("account",)
     search_fields = ("transaction__transaction_id",)

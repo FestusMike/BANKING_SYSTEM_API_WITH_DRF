@@ -1,0 +1,20 @@
+{% extends 'main.html' %}
+{% block content %}
+  <div class="container">
+        <p>Hi, {{ recipient_name }}</p>
+
+        <p>This is to inform you that a credit transaction of {{amount}} has occurred on your account. Your current balance is now {{current_balance}}. Please check the transaction details below:</p>
+
+        <div class="transaction-details">
+            <p><strong>Sender:</strong> {{ sender_name }}</p>
+            <p><strong>Amount:</strong> {{ amount }}</p>
+            <p><strong>Description:</strong> {{ description }}</p>
+            <p><strong>Date:</strong> {{ date }}</p>
+             <p><strong>Time:</strong> {{ time }}</p>
+            
+        </div>
+
+        <p><strong>&copy; Longman Technologies</strong></p>
+    </div>
+{% endblock %}
+

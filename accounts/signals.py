@@ -6,6 +6,7 @@ from rest_framework import status
 from .utils import send_email
 import os
 
+
 @receiver(post_save, sender=User)
 def send_welcome_email(sender, instance, created, **kwargs):
     """
@@ -33,12 +34,9 @@ def send_welcome_email(sender, instance, created, **kwargs):
     Longman Technologies.
     """
         sender_name = "Longman Technologies"
-        sender_email = os.environ.get("EMAIL_SENDER")
-        reply_to_email = os.environ.get("REPLY_TO_EMAIL")
-        to = [{
-            "email": instance.email,
-            "name": instance.full_name
-        }]
+        sender_email = os.getenv("EMAIL_SENDER")
+        reply_to_email = os.getenv("REPLY_TO_EMAIL")
+        to = [{"email": instance.email, "name": instance.full_name}]
 
         sent_email = send_email(
             to=to,
@@ -56,12 +54,17 @@ def send_welcome_email(sender, instance, created, **kwargs):
             }
             return response_data
 
+
 @receiver(post_save, sender=User)
 def send_new_otp(sender, instance, created, **kwargs):
     """
     This function resends a new otp if the former one expires.
     """
-    if not created and (instance.otp and instance.has_sent_another_welcome_otp and not instance.is_active):
+    if not created and (
+        instance.otp
+        and instance.has_sent_another_welcome_otp
+        and not instance.is_active
+    ):
         subject = "Verify your email address."
         message = f"""
     Hi, {instance.full_name}
@@ -77,8 +80,8 @@ def send_new_otp(sender, instance, created, **kwargs):
     Longman Technologies
     """
         sender_name = "Longman Technologies"
-        sender_email = os.environ.get("EMAIL_SENDER")
-        reply_to_email = os.environ.get("REPLY_TO_EMAIL")
+        sender_email = os.getenv("EMAIL_SENDER")
+        reply_to_email = os.getenv("REPLY_TO_EMAIL")
         to = [{"email": instance.email, "name": instance.full_name}]
         sent_email = send_email(
             to=to,
@@ -88,6 +91,7 @@ def send_new_otp(sender, instance, created, **kwargs):
             html_content=message,
         )
         return sent_email == "Success"
+
 
 @receiver(post_save, sender=User)
 def send_password_reset_otp(sender, instance, created, **kwargs):
@@ -112,14 +116,14 @@ def send_password_reset_otp(sender, instance, created, **kwargs):
     Longman Technologies
     """
         sender_name = "Longman Technologies"
-        sender_email = os.environ.get("EMAIL_SENDER")
-        reply_to_email = os.environ.get("REPLY_TO_EMAIL")
+        sender_email = os.getenv("EMAIL_SENDER")
+        reply_to_email = os.getenv("REPLY_TO_EMAIL")
         to = [{"email": instance.email, "name": instance.full_name}]
         sent_email = send_email(
-        to=to,
-        subject=subject,
-        sender={"name": sender_name, "email": sender_email},
-        reply_to={"email": reply_to_email},
-        html_content=message,
+            to=to,
+            subject=subject,
+            sender={"name": sender_name, "email": sender_email},
+            reply_to={"email": reply_to_email},
+            html_content=message,
         )
         return sent_email == "Success"

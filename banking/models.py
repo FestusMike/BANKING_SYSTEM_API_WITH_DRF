@@ -64,6 +64,7 @@ class Transaction(models.Model):
     class Meta:
         db_table = "Transactions"
         abstract = False
+        
 
     def save(self, *args, **kwargs):
         if not self.transaction_id:
@@ -77,7 +78,6 @@ class Ledger(BaseModel):
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='ledger_entries')
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, related_name='ledger_entries')
     balance_after_transaction = models.DecimalField(max_digits=12, decimal_places=2)
-    timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "Ledger"

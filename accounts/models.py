@@ -12,6 +12,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     email = models.EmailField(unique=True, blank=False, null=False)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     date_of_birth = models.DateField(null=True)
+    age = models.IntegerField(null=True, blank=True)
     address = models.CharField(max_length=50, blank=True, null=True)
     otp = models.IntegerField(null=True, blank=True)
     pin = models.CharField(null=True, max_length=255)

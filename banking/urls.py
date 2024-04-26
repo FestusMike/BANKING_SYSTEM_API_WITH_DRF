@@ -1,5 +1,10 @@
 from django.urls import path
-from .views import TransferAPIView, UserTransactionListView, UserTransactionRetrieveView, StatementOfAccountAPIView
+from .views import (TransferAPIView, 
+                    UserTransactionListView, 
+                    UserTransactionRetrieveView, 
+                    StatementOfAccountPDFView, 
+                    TransactionImageView, 
+                    TransactionPdfView)
 
 urlpatterns = [
     path("transfer", TransferAPIView.as_view(), name="funds-transfer"),
@@ -7,9 +12,20 @@ urlpatterns = [
     path(
         "transactions/<int:transaction_id>",
         UserTransactionRetrieveView.as_view(),
-        name="user-transaction-detail",
+        name="transaction-detail",
     ),
     path(
-        "statement", StatementOfAccountAPIView.as_view(), name="statement-of-account"
+        "transactions/<int:transaction_id>/image",
+        TransactionImageView.as_view(),
+        name="transaction-image",
     ),
+    path(
+        "transactions/<int:transaction_id>/pdf",
+        TransactionPdfView.as_view(),
+        name="transaction-pdf",
+    ),
+    path(
+        "statement", 
+        StatementOfAccountPDFView.as_view(), 
+        name="send-account-statement"),
 ]
