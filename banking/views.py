@@ -272,39 +272,39 @@ class StatementOfAccountPDFView(generics.GenericAPIView):
         end_date = request.query_params.get("end_date")
 
         if start_date and end_date:
-            start_date = make_aware(parse_datetime(start_date + "T00:00:00"))
-            end_date = make_aware(parse_datetime(end_date + "T23:59:59"))
-            ledger_entries = Ledger.objects.filter(
-                account__in=accounts,
-                transaction__timestamp__range=[start_date, end_date],
-            )
+            try:
+                start_date = make_aware(parse_datetime(start_date + "T00:00:00"))
+                end_date = make_aware(parse_datetime(end_date + "T23:59:59"))
+                ledger_entries = Ledger.objects.filter(
+                    account__in=accounts,
+                    transaction__timestamp__range=[start_date, end_date]
+                ).select_related("transaction").order_by("-transaction__timestamp")
+                start_date_str = start_date.strftime("%Y-%m-%d")
+                end_date_str = end_date.strftime("%Y-%m-%d")
+            except ValueError:
+                return Response({"error": "Invalid date format provided."}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            ledger_entries = Ledger.objects.filter(
-                account__in=accounts,
-            )
-        ledger_entries = ledger_entries.select_related("transaction").order_by("-transaction__timestamp")
+            ledger_entries = Ledger.objects.filter(account__in=accounts).select_related("transaction").order_by("-transaction__timestamp")
+            start_date_str = "the beginning"
+            end_date_str = "now"
 
         pdf = generate_ledger_pdf(ledger_entries)
         pdf_base64 = base64.b64encode(pdf).decode("utf-8")
 
-        attachment = [
-            {
-                "content": pdf_base64,
-                "name": f"{user.full_name}_{timezone.now()}_statement_of_account.pdf",
-                "type": "application/pdf",
-            }
-        ]
-        date_label = f"""This is the statement of account for all your transactions from 
-        {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}
-        """ if start_date and end_date else "This is the statement of account for all your transactions"
-        
+        attachment = [{
+            "content": pdf_base64,
+            "name": f"{user.full_name}_statement_of_account_{timezone.localtime().strftime('%Y-%m-%d_%H-%M-%S')}.pdf",
+            "type": "application/pdf",
+        }]
+
         html_content = render_to_string(
             "statement_of_account.html",
             {
                 "user": user,
-                "date_range": date_label,
+                "start_date": start_date_str,
+                "end_date": end_date_str,
                 "company_name": "Longman Technologies",
-            },
+            }
         )
 
         to = [{"email": user.email, "name": user.full_name}]

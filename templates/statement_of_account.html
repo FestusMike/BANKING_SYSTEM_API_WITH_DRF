@@ -4,9 +4,12 @@
     <h1>Statement of Account</h1>
     <p>Dear {{ user.full_name }},</p>
 
-    <p>{{ date_range }}</strong></p>
+    {% if start_date != "the beginning" and end_date != "now" %}
+        <p>This is the statement of all your transactions from <strong>{{ start_date }}</strong> to <strong>{{ end_date }}</strong>. Please find it attached below.</p>
+    {% else %}
+        <p>This is the complete statement of all your transactions with us up to now. Please find it attached below.</p>
+    {% endif %}
 
-    <p>Please find attached the detailed ledger report from <strong>{{ company_name }}</strong>.</p>
     <p>Thank you for trusting us with your financial needs.</p>
     <p>Best Regards,<br/>Longman Technologies</p>
 {% endblock %}
