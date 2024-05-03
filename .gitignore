@@ -1,7 +1,6 @@
 .env
 db.sqlite3
 commands.sh
-*/migrations
-*/__pycache__
 junk.json
+2-lane 2-way ahead.jpg
 

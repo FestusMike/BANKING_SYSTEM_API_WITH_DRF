@@ -156,8 +156,16 @@ class UserTransactionListView(generics.ListAPIView):
         )
 
         transactions = debit_transactions | credit_transactions
-
         return transactions.order_by("-timestamp")
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        response_data = {
+            "total": f"{queryset.count()} objects retrieved",
+            "data": serializer.data
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class UserTransactionRetrieveView(generics.RetrieveAPIView):
@@ -288,7 +296,7 @@ class StatementOfAccountPDFView(generics.GenericAPIView):
             start_date_str = "the beginning"
             end_date_str = "now"
 
-        pdf = generate_ledger_pdf(ledger_entries)
+        pdf = generate_ledger_pdf(ledger_entries, user, start_date, end_date)
         pdf_base64 = base64.b64encode(pdf).decode("utf-8")
 
         attachment = [{
