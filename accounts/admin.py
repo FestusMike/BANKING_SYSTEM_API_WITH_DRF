@@ -59,6 +59,7 @@ class CustomUserAdmin(UserAdmin):
     list_display = (
         "full_name",
         "email",
+        "age",
         "otp",
         "is_active",
     )
