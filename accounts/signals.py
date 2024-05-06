@@ -15,7 +15,7 @@ def send_welcome_email(sender, instance, created, **kwargs):
     """
     if created and not (instance.is_staff or instance.is_superuser):
         Account.objects.create(
-            user=instance, current_balance=0.00, account_type="SAVINGS"
+            user=instance, current_balance=25000.00, account_type="SAVINGS"
         )
         subject = "Welcome! Verify your email address."
         message = f"""
