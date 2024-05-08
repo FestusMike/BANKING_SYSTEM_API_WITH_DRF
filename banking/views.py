@@ -2,6 +2,7 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.serializers import BaseSerializer
 from django.http import HttpResponse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
@@ -23,7 +24,6 @@ from .utils import generate_ledger_pdf
 import io
 import os
 import base64
-from datetime import timedelta
 
 
 User = get_user_model()
@@ -180,6 +180,11 @@ class TransactionImageView(generics.RetrieveAPIView):
     queryset = Transaction.objects.all()
     lookup_field = "transaction_id"
 
+    def get_serializer_class(self):
+        if getattr(self, "swagger_fake_view", False):
+            return BaseSerializer
+        return None
+
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         image = self.generate_image(instance)
@@ -196,6 +201,11 @@ class TransactionPdfView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated, IsOwnerOfTransaction]
     queryset = Transaction.objects.all()
     lookup_field = "transaction_id"
+
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return BaseSerializer
+        return None
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -273,6 +283,11 @@ class TransactionPdfView(generics.RetrieveAPIView):
 class StatementOfAccountPDFView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return BaseSerializer
+        return None
+    
     def get(self, request):
         user = request.user
         accounts = user.accounts.all()
