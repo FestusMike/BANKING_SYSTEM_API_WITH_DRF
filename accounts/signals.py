@@ -6,7 +6,6 @@ from rest_framework import status
 from .utils import send_email
 import os
 
-
 @receiver(post_save, sender=User)
 def send_welcome_email(sender, instance, created, **kwargs):
     """

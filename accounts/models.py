@@ -48,4 +48,4 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
         if self.id and self.full_name: 
             return f"{self.id} - {self.full_name}"
         else:
-            return "Superuser Account"
+            return self.email
