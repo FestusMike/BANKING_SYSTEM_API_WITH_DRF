@@ -16,7 +16,7 @@ def GenerateOTP(length: int):
 
 
 def profile_image_path(instance, filename):
-    return f"profiles/{instance.first_name}_{instance.last_name}/{filename}"
+    return f"profiles/{instance.full_name}/{filename}"
 
 
 def send_email(to, reply_to, html_content, sender, subject):

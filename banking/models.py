@@ -7,10 +7,10 @@ from .constants import ACCOUNT_TYPE, TRANSACTION_TYPE, TRANSACTION_MODE
 
 User = get_user_model()
 
-class Account(models.Model):
+class Account(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="accounts")
     account_number = models.BigIntegerField(
-        unique=True, primary_key=True, editable=False, default=generate_account_number
+        unique=True, editable=False, default=generate_account_number
     )
     account_type = models.CharField(
         max_length=30, null=False, choices=ACCOUNT_TYPE, default="SAVINGS"
@@ -30,9 +30,9 @@ class Account(models.Model):
     def __str__(self) -> str:
         return f"{self.account_number} - {self.user.full_name}"
 
-class Transaction(models.Model):
+class Transaction(BaseModel):
     transaction_id = models.BigIntegerField(
-        unique=True, primary_key=True, editable=False, default=generate_transaction_id
+        unique=True, editable=False, default=generate_transaction_id
     )
     transaction_type = models.CharField(
         max_length=20, choices=TRANSACTION_TYPE, null=False, default="DEBIT"
@@ -46,16 +46,16 @@ class Transaction(models.Model):
     from_account = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
-        related_name="outgoing_transactions",
         null=True,
         blank=True,
+        related_name = "outgoing_transactions"
     )
     to_account = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
-        related_name="incoming_transactions",
         null=True,
         blank=True,
+        related_name = "incoming_transactions"
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.CharField(max_length=255, null=True, blank=True)
@@ -65,7 +65,6 @@ class Transaction(models.Model):
         db_table = "Transactions"
         abstract = False
         
-
     def save(self, *args, **kwargs):
         if not self.transaction_id:
             self.transaction_id = generate_transaction_id()
@@ -75,8 +74,8 @@ class Transaction(models.Model):
         return f"{self.transaction_id} - {self.from_account.user.full_name if self.transaction_type == 'DEBIT' else self.to_account.user.full_name}"
 
 class Ledger(BaseModel):
-    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='ledger_entries')
-    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, related_name='ledger_entries')
+    account = models.ForeignKey(Account, on_delete=models.CASCADE)
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
     balance_after_transaction = models.DecimalField(max_digits=12, decimal_places=2)
 
     class Meta:

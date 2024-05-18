@@ -8,7 +8,6 @@ class TransferSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     pin = serializers.CharField(max_length=4)
 
-
 class AccountSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
 
@@ -17,8 +16,7 @@ class AccountSerializer(serializers.ModelSerializer):
         fields = ["account_number", "user"]
 
     def get_user(self, obj):
-        return obj.user.full_name 
-
+        return obj.user.full_name
 
 class TransactionSerializer(serializers.ModelSerializer):
     from_account = AccountSerializer()
@@ -27,6 +25,3 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = "__all__"
-
-
-

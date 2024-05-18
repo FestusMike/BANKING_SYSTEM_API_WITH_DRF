@@ -19,23 +19,20 @@ class UserRegistrationSerializer(serializers.Serializer):
         return value
 
 class OTPVerificationSerializer(serializers.Serializer):
-    otp = serializers.IntegerField()
+    otp = serializers.CharField()
 
 class NewOTPRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 class TransactionPinSerializer(serializers.Serializer):
-    pin = serializers.CharField()
+    pin = serializers.CharField(max_length=4)
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
-class LogoutSerializer(serializers.Serializer):
-    pass
-
 class PasswordSerializer(serializers.Serializer):
-    otp = serializers.IntegerField()
+    otp = serializers.CharField()
     password1 = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
 
@@ -77,13 +74,11 @@ class PasswordChangeAuthenticatedSerializer(serializers.Serializer):
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = User
         fields = (
             "date_of_birth",
             "phone_number",
-            "date_of_birth",
             "address",
             "profile_picture",
         )
@@ -111,4 +106,19 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
-    
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "full_name",
+            "email",
+            "date_of_birth",
+            "phone_number",
+            "address",
+            "profile_picture",
+            "is_staff",
+            "is_active",
+            "is_superuser"
+        ]
+        extra_kwargs = {"id": {"read_only": True}}

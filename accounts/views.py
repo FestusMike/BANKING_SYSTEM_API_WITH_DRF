@@ -2,27 +2,30 @@ from datetime import timedelta
 from django.utils import timezone
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import make_password
+from django.template.loader import render_to_string
 from rest_framework import status, generics
-from .utils import GenerateOTP
 from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .permissions import IsOwnerOrAdmin
+from .permissions import IsOwner
+from .utils import GenerateOTP, send_email
 from .serializers import (
     UserRegistrationSerializer,
     OTPVerificationSerializer,
     NewOTPRequestSerializer,
     TransactionPinSerializer,
     LoginSerializer,
-    LogoutSerializer,
     PasswordSerializer,
     PasswordChangeAuthenticatedSerializer,
-    UserProfileUpdateSerializer
+    UserProfileUpdateSerializer,
+    UserDetailSerializer
 )
+from banking.models import Account, Transaction, Ledger
 import re
+import os
 
 # Create your views here.
 
@@ -31,7 +34,7 @@ User = get_user_model()
 
 class UserRegistrationAPIView(generics.GenericAPIView):
     """
-    This View registers a new user based on their e-mail, first_name, and last_name.
+    This View registers a new user based on their full name and email address.
     When a user registers, their data is first saved in the database, and an OTP is sent
     to verify their entered e-mail address.
     """
@@ -45,26 +48,24 @@ class UserRegistrationAPIView(generics.GenericAPIView):
         if User.objects.filter(email=email).exists():
             return Response(
                 {
-                    "status": status.HTTP_406_NOT_ACCEPTABLE,
+                    "status": status.HTTP_400_BAD_REQUEST,
                     "Success": False,
                     "message": "User with this email already exists",
                 },
-                status=status.HTTP_406_NOT_ACCEPTABLE,
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        otp = GenerateOTP(length=4)
         full_name = serializer.validated_data["full_name"]
         full_name_title = ' '.join(word.capitalize() for word in full_name.split())
-        user = User.objects.create_user(
+        User.objects.create_user(
             email=email,
             full_name=full_name_title,
-            otp=otp,
             is_active=False
         )
         serializer.validated_data["full_name"] = full_name_title
         response_data = {
             "status": status.HTTP_201_CREATED,
             "Success": True,
-            "message": f"Enter the 4-digit OTP that has been sent to {email}. Please check your inbox or spam folder.",
+            "message": "Enter the 4-digit OTP that has been sent to your email address. Please check your inbox or spam folder.",
             "data": serializer.validated_data 
         }
         return Response(response_data, status=status.HTTP_201_CREATED)
@@ -80,7 +81,6 @@ class ResendOTPAPIView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
-        otp = GenerateOTP(length=4)
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
@@ -90,16 +90,52 @@ class ResendOTPAPIView(generics.GenericAPIView):
                 "message": "E-mail doesn't exist",
             }
             return Response(response_data, status=status.HTTP_404_NOT_FOUND)
-        user.otp = otp
-        user.has_sent_another_welcome_otp = True
-        user.save()
+        if user and user.is_active:
+            response_data = {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "Success": False,
+                "message": "You are not allowed to perform this operation, as your account has been verified",
+            }
+            return Response(response_data, status=status.HTTP_404_NOT_FOUND)
 
-        response_data = {
+        otp_plain = GenerateOTP(length=4)
+        otp_hashed = make_password(otp_plain)
+
+        user.otp = otp_hashed
+        user.save()
+        
+        subject = "Verify your email address."
+        context = {'full_name': user.full_name, 'otp': otp_plain}
+        
+        message = render_to_string('otp_resend.html', context)
+        
+        sender_name = "Longman Technologies"
+        sender_email = os.getenv("EMAIL_SENDER")
+        reply_to_email = os.getenv("REPLY_TO_EMAIL")
+        to = [{"email": user.email, "name": user.full_name}]
+        sent_email = send_email(
+            to=to,
+            subject=subject,
+            sender={"name": sender_name, "email": sender_email},
+            reply_to={"email": reply_to_email},
+            html_content=message,
+        )
+        
+        if sent_email == "Success":
+            response_data = {
                 "status": status.HTTP_200_OK,
                 "Success": True,
-                "message": f"Enter the 4-digit OTP that has been sent to {email}. Please check your inbox or spam folder.",
+                "message": f"Enter the 4-digit OTP that has been sent to your email address. Please check your inbox or spam folder.",
             }
-        return Response(response_data, status=status.HTTP_200_OK)
+            return Response(response_data, status=status.HTTP_200_OK)
+        else:
+            response_data = {
+                "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "Success": False,
+                "message": "An error occurred while sending the OTP email. Please try again later.",
+            }
+            return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class OTPVerificationAPIView(generics.GenericAPIView):
     """
@@ -116,41 +152,40 @@ class OTPVerificationAPIView(generics.GenericAPIView):
         otp = serializer.validated_data["otp"]
         try:
             user = User.objects.get(otp=otp)
-
-            if user.date_updated + timedelta(minutes=10) < timezone.now():
-                return Response(
-                    {
-                        "status": status.HTTP_406_NOT_ACCEPTABLE,
-                        "Success": False,
-                        "message": "OTP has expired. Kindly request another.",
-                    },
-                    status=status.HTTP_406_NOT_ACCEPTABLE,
-                )
-            else:
-                return Response(
-                    {
-                        "status": status.HTTP_200_OK,
-                        "Success": True,
-                        "message": "OTP verification successful.",
-                    },
-                    status=status.HTTP_200_OK,
-                )
-
         except User.DoesNotExist:
+            return Response(
+                {
+                    "status": status.HTTP_404_NOT_FOUND,
+                    "Success": False,
+                    "message": "Invalid OTP",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if user.date_updated + timedelta(minutes=10) < timezone.now():
             return Response(
                 {
                     "status": status.HTTP_400_BAD_REQUEST,
                     "Success": False,
-                    "message": "Invalid OTP",
+                    "message": "OTP has expired. Kindly request another.",
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            return Response(
+                {
+                    "status": status.HTTP_200_OK,
+                    "Success": True,
+                    "message": "OTP verification successful.",
+                },
+                status=status.HTTP_200_OK,
             )
-
+            
+                
 class PasswordSetUpAPIView(generics.GenericAPIView):
     """
     This View allows a user whose OTP has been verified to create a password.
     Once the password is created, their account becomes verified and they become
-    a sweeftly family member.
+    a bona fide bank customer.
     """
 
     serializer_class = PasswordSerializer
@@ -165,32 +200,61 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
         except User.DoesNotExist:
             return Response(
                 {
-                    "status": status.HTTP_400_BAD_REQUEST,
+                    "status": status.HTTP_404_NOT_FOUND,
                     "Success": False,
                     "message": "Invalid OTP",
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_404_NOT_FOUND,
             )
-
+        if user.date_updated + timedelta(minutes=10) < timezone.now():
+            return Response(
+                {
+                    "status": status.HTTP_400_BAD_REQUEST,
+                    "Success": False,
+                    "message": "OTP has expired. Kindly request another.",
+                },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         user.set_password(serializer.validated_data["password1"])
         user.otp = None
         user.is_active = True
         user.last_login = timezone.now()
         user.save()
 
+        account = Account.objects.create(
+            user=user, current_balance=20000.00, account_type="SAVINGS"
+        )
+
+        transaction = Transaction.objects.create(
+            transaction_type="CREDIT",
+            transaction_mode="AUTO CREDIT",
+            from_account=None,  
+            to_account=account,
+            amount=20000.00,
+            description="Welcome to the Longman Family. Enjoy your welcome bonus!",
+        )
+
+        Ledger.objects.create(
+            account=account,
+            transaction = transaction,
+            balance_after_transaction = account.current_balance 
+        )
+
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
-        refresh_token = str(refresh)
+        refresh_token = str(refresh.access_token)
 
         response_data = {
             "status": status.HTTP_201_CREATED,
             "Success": True,
-            "message": "Password set successfully.",
+            "message": "Password set successfully and account creation complete. A token of 20,000.00 naira has been credited to your account as a welcome bonus.",
+            "account_number": account.account_number,
             "access_token": access_token,
             "refresh_token": refresh_token,
         }
 
         return Response(response_data, status=status.HTTP_201_CREATED)
+
 
 class TransactionPinCreateAPIView(generics.GenericAPIView):
     """
@@ -211,11 +275,11 @@ class TransactionPinCreateAPIView(generics.GenericAPIView):
         if not re.match("^[0-9]{4}$", pin):
             return Response(
                 {
-                    "status": status.HTTP_406_NOT_ACCEPTABLE,
+                    "status": status.HTTP_400_BAD_REQUEST,
                     "Success": False,
                     "message": "PIN must be numeric and in four digits",
                 },
-                status=status.HTTP_406_NOT_ACCEPTABLE,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         user.pin = make_password(pin)
@@ -254,11 +318,14 @@ class LoginAPIView(generics.GenericAPIView):
             refresh_token = str(refresh)
             user.last_login = timezone.now()
             user.save()
+            accounts = user.accounts.all()
+            account_numbers = [account.account_number for account in accounts]
             return Response(
                 {
                     "status": status.HTTP_200_OK,
                     "Success": True,
-                    "message": "Login succesful",
+                    "message": "Login successful",
+                    "account_number" : account_numbers,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                 },
@@ -287,9 +354,14 @@ class UserLogoutAPIView(generics.GenericAPIView):
     """
 
     permission_classes = [IsAuthenticated]
-    serializer_class = LogoutSerializer
     authentication_classes = [JWTAuthentication]
 
+    def get_serializer_class(self):
+        from rest_framework.serializers import BaseSerializer
+        if getattr(self, 'swagger_fake_view', False):
+            return BaseSerializer
+        return None
+    
     def post(self, request, *args, **kwargs):
         try:
             refresh_token = request.data.get("refresh")
@@ -302,11 +374,11 @@ class UserLogoutAPIView(generics.GenericAPIView):
             user.last_logout = timezone.now()
             user.save()
             response_data = {
-                "status": status.HTTP_205_RESET_CONTENT,
+                "status": status.HTTP_200_OK,
                 "Success": True,
                 "message": "Log out successful",
             }
-            return Response(response_data, status=status.HTTP_205_RESET_CONTENT)
+            return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:
             response_data = {
                 "status": status.HTTP_400_BAD_REQUEST,
@@ -338,18 +410,42 @@ class PasswordChangeOTPAPIView(generics.GenericAPIView):
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )
+        
         otp = GenerateOTP(length=4)
         user.otp = otp
         user.save()
 
-        return Response(
-                {
-                    "status": status.HTTP_200_OK,
-                    "Success": True,
-                    "message": f"A password reset OTP has been sent to: {email}. Please note that it expires after 10 minutes.",
-                },
-                status=status.HTTP_200_OK,
-            )
+        subject = "Password Reset OTP"
+        context = {'full_name': user.full_name, 'otp': otp}
+        
+        message = render_to_string('password_reset.html', context) 
+        
+        sender_name = "Longman Technologies"
+        sender_email = os.getenv("EMAIL_SENDER")
+        reply_to_email = os.getenv("REPLY_TO_EMAIL")
+        to = [{"email": user.email, "name": user.full_name}]
+        sent_email = send_email(
+            to=to,
+            subject=subject,
+            sender={"name": sender_name, "email": sender_email},
+            reply_to={"email": reply_to_email},
+            html_content=message,
+        )
+        
+        if sent_email == "Success":
+            response_data = {
+                "status": status.HTTP_200_OK,
+                "Success": True,
+                "message": "A password reset OTP has been sent to your registered email address. Please note that it expires after 10 minutes.",
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
+        else:
+            response_data = {
+                "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "Success": False,
+                "message": "An error occurred while sending the OTP email. Please try again later.",
+            }
+            return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class PasswordChangeAPIView(generics.GenericAPIView):
     """
@@ -368,30 +464,6 @@ class PasswordChangeAPIView(generics.GenericAPIView):
         otp = serializer.validated_data["otp"]
         try:
             user = User.objects.get(otp=otp)
-            if request.user.is_authenticated:
-                password_serializer = PasswordChangeAuthenticatedSerializer(
-                    data=request.data, context={"user": user}
-                )
-            else:
-                password_serializer = PasswordSerializer(data=request.data)
-
-            password_serializer.is_valid(raise_exception=True)
-
-            if "new_password1" in password_serializer.validated_data:
-                new_password = password_serializer.validated_data["new_password1"]
-            else:
-                new_password = password_serializer.validated_data["password1"]
-
-            self.change_password(user, new_password)
-            return Response(
-                {
-                    "status": status.HTTP_200_OK,
-                    "Success": True,
-                    "message": "Password changed successfully",
-                },
-                status=status.HTTP_200_OK,
-            )
-
         except User.DoesNotExist:
             return Response(
                 {
@@ -401,18 +473,50 @@ class PasswordChangeAPIView(generics.GenericAPIView):
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )
+        if user.date_updated + timedelta(minutes=10) < timezone.now():
+            return Response(
+                {
+                    "status": status.HTTP_400_BAD_REQUEST,
+                    "Success": False,
+                    "message": "OTP has expired. Kindly request another.",
+                },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        if request.user.is_authenticated:
+                password_serializer = PasswordChangeAuthenticatedSerializer(
+                    data=request.data, context={"user": user}
+                )
+        else:
+            password_serializer = PasswordSerializer(data=request.data)
+
+        password_serializer.is_valid(raise_exception=True)
+
+        if "new_password1" in password_serializer.validated_data:
+             new_password = password_serializer.validated_data["new_password1"]
+        else:
+            new_password = password_serializer.validated_data["password1"]
+
+        self.change_password(user, new_password)
+        return Response(
+                {
+                    "status": status.HTTP_200_OK,
+                    "Success": True,
+                    "message": "Password changed successfully",
+                },
+                status=status.HTTP_200_OK,
+            )
 
     def change_password(self, user, new_password):
         user.set_password(new_password)
         user.otp = None
         user.save()
 
-class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
+class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
     """
     View for updating user profile information.
     """
 
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, IsOwner]
     serializer_class = UserProfileUpdateSerializer
     authentication_classes = [JWTAuthentication]
     parser_classes = [FormParser, MultiPartParser]
@@ -440,3 +544,20 @@ class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
 
     def perform_update(self, serializer):
         serializer.save()
+
+class UserDetailAPIView(generics.GenericAPIView):
+    serializer_class = UserDetailSerializer
+    permission_classes = [IsAuthenticated, IsOwner]
+
+    def get_object(self):
+        return self.request.user
+    
+    def get(self, request):
+        instance  = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({
+            'status': status.HTTP_200_OK,
+            'success' : True,
+            'message': 'User details retrieved successfully',
+            'data': serializer.data
+        })

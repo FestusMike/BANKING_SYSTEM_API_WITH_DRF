@@ -10,9 +10,10 @@ def transfer_funds(from_account, to_account_number, amount, description):
             if from_account.current_balance < amount:
                 raise ValueError("Insufficient funds for transfer")
 
-            to_account = Account.objects.select_for_update().get(
-                account_number=to_account_number
-            )
+            to_account = Account.objects.select_for_update().get(account_number=to_account_number)
+
+            if from_account.user == to_account.user:
+                raise ValueError("Cannot transfer funds to yourself")
 
             debit_transaction = Transaction.objects.create(
                 transaction_type="DEBIT",

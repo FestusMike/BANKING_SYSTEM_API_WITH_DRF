@@ -30,7 +30,6 @@ class CustomUserAdmin(UserAdmin):
                     "phone_number",
                     #"date_of_birth",
                     "address",
-                    "otp",
                     "profile_picture",
                     "is_active",
                     "is_staff",
@@ -48,7 +47,6 @@ class CustomUserAdmin(UserAdmin):
                     "full_name",
                     "email",
                     "address",
-                    "otp",
                     "password1",
                     "password2",
                     "is_active",
@@ -59,7 +57,7 @@ class CustomUserAdmin(UserAdmin):
     list_display = (
         "full_name",
         "email",
-        "age",
+        "phone_number",
         "otp",
         "is_active",
     )

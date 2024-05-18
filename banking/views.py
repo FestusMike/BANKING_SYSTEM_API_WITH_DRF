@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.serializers import BaseSerializer
+from rest_framework.pagination import PageNumberPagination
 from django.http import HttpResponse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
@@ -10,9 +11,6 @@ from django.template.loader import render_to_string
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import make_aware
 from django.utils import timezone
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from PIL import Image
 from .utils import send_attachment_email
 from accounts.utils import send_email
@@ -24,7 +22,9 @@ from .utils import generate_ledger_pdf
 import io
 import os
 import base64
+import logging
 
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -36,20 +36,22 @@ class TransferAPIView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
         from_user = request.user
 
-        if not check_password(data["pin"], from_user.pin):
-            return Response(
-                {"error": "Incorrect PIN"}, status=status.HTTP_400_BAD_REQUEST
-            )
+        if not check_password(serializer.validated_data["pin"], from_user.pin):
+            response_data = {
+                "status" : status.HTTP_400_BAD_REQUEST,
+                "success" : False,
+                "error": "Incorrect PIN"
+                } 
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             debit_transaction, credit_transaction = transfer_funds(
                 from_user.id,
-                data["to_account_number"],
-                data["amount"],
-                data.get("description", ""),
+                serializer.validated_data["to_account_number"],
+                serializer.validated_data["amount"],
+                serializer.validated_data.get("description", ""),
             )
 
             sender_name = debit_transaction.from_account.user.full_name
@@ -71,36 +73,29 @@ class TransferAPIView(generics.GenericAPIView):
             date = local_timestamp.strftime("%A, %d %B, %Y")
             time = local_timestamp.strftime("%H:%M:%S")
 
-            subject = "Transaction Alert!"
-            credit_template = "credit_alert_email.html"
-            debit_template = "debit_alert_email.html"
-
-            credit_message = render_to_string(
-                credit_template,
-                {
+            credit_context =  {
                     "recipient_name": recipient_name,
                     "sender_name": sender_name,
-                    "amount": data["amount"],
-                    "description": data.get("description", ""),
+                    "amount": serializer.validated_data["amount"],
+                    "description": serializer.validated_data.get("description", ""),
                     "date": date,
                     "time": time,
                     "current_balance": recipient_balance,
-                },
-            )
-
-            debit_message = render_to_string(
-                debit_template,
-                {
+                }
+            debit_context = {
                     "recipient_name": recipient_name,
                     "sender_name": sender_name,
                     "recipient_account_number": recipient_account_number,
-                    "amount": data["amount"],
-                    "description": data.get("description", ""),
+                    "amount": serializer.validated_data["amount"],
+                    "description": serializer.validated_data.get("description", ""),
                     "date": date,
                     "time": time,
                     "current_balance": sender_balance,
-                },
-            )
+                }
+
+            credit_message = render_to_string('credit_alert_email.html', credit_context)
+            debit_message = render_to_string('debit_alert_email.html', debit_context)
+            subject = "Transaction Alert!"
 
             if debit_transaction:
                 send_email(
@@ -130,7 +125,7 @@ class TransferAPIView(generics.GenericAPIView):
                 {
                     "status": status.HTTP_200_OK,
                     "Success": True,
-                    "message": f"Your transfer of {data['amount']} to {recipient_name} is successful.",
+                    "message": f"Your transfer of {serializer.validated_data['amount']} to {recipient_name} is successful.",
                     "transaction_id": debit_transaction.transaction_id,
                 }
             )
@@ -142,6 +137,7 @@ class TransferAPIView(generics.GenericAPIView):
 class UserTransactionListView(generics.ListAPIView):
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated, IsOwnerOfTransaction]
+    pagination_class = PageNumberPagination
 
     def get_queryset(self):
         user = self.request.user
@@ -159,14 +155,29 @@ class UserTransactionListView(generics.ListAPIView):
         return transactions.order_by("-timestamp")
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        response_data = {
-            "total": f"{queryset.count()} objects retrieved",
-            "data": serializer.data
-        }
-        return Response(response_data, status=status.HTTP_200_OK)
+        try:
+            queryset = self.get_queryset()
 
+            paginator = self.pagination_class()
+            paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+            
+            serializer = self.get_serializer(paginated_queryset, many=True)
+            response_data = {
+                "status": status.HTTP_200_OK,
+                "success": True,
+                "data": serializer.data
+            }
+            return paginator.get_paginated_response(response_data)
+        except Exception as e:
+            logger.error(f"An error occurred: {e}")
+            return Response(
+                {
+                    "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "success": False,
+                    "message": "An error occurred while processing your request."
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class UserTransactionRetrieveView(generics.RetrieveAPIView):
     serializer_class = TransactionSerializer
@@ -197,89 +208,6 @@ class TransactionImageView(generics.RetrieveAPIView):
         return img_byte_array.getvalue()
 
 
-class TransactionPdfView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated, IsOwnerOfTransaction]
-    queryset = Transaction.objects.all()
-    lookup_field = "transaction_id"
-
-    def get_serializer_class(self):
-        if getattr(self, 'swagger_fake_view', False):
-            return BaseSerializer
-        return None
-
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        pdf = self.generate_pdf(instance)
-        response = HttpResponse(pdf, content_type="application/pdf")
-        response["Content-Disposition"] = (
-            'attachment; filename=f"{self.request.user.full_name}_{instance.transaction_id}.pdf"'
-        )
-        return response
-
-    def generate_pdf(self, transaction):
-        pdf_byte_array = io.BytesIO()
-        doc = SimpleDocTemplate(pdf_byte_array, pagesize=letter)
-
-        transaction_id = transaction.transaction_id
-        timestamp = transaction.timestamp
-        amount = transaction.amount
-        description = transaction.description
-        from_account = transaction.from_account
-        to_account = transaction.to_account
-
-        data = [
-            ["Transaction ID:", transaction_id],
-            ["Timestamp:", timestamp.strftime("%Y-%m-%d %H:%M:%S")],
-            ["Amount:", amount],
-            ["Description:", description],
-            [
-                "Sender:",
-                "{} ({})".format(
-                    (
-                        "You | "
-                        if self.request.user == from_account.user
-                        else to_account.user.full_name
-                    ),
-                    (
-                        from_account.account_number
-                        if self.request.user == from_account.user
-                        else to_account.account_number
-                    ),
-                ),
-            ],
-            [
-                "Recipient:",
-                "{} ({})".format(
-                    (
-                        "You | "
-                        if self.request.user == to_account.user
-                        else from_account.user.full_name
-                    ),
-                    (
-                        to_account.account_number
-                        if self.request.user == to_account.user
-                        else from_account.account_number
-                    ),
-                ),
-            ],
-        ]
-        table = Table(data)
-        style = TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("FONTNAME", (0, 0), (-1, 0), "Courier-Bold"),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
-                ("GRID", (0, 0), (-1, -1), 1, colors.black),
-            ]
-        )
-        table.setStyle(style)
-        doc.build([table])
-        return pdf_byte_array.getvalue()
-
-
 class StatementOfAccountPDFView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
@@ -287,7 +215,7 @@ class StatementOfAccountPDFView(generics.GenericAPIView):
         if getattr(self, 'swagger_fake_view', False):
             return BaseSerializer
         return None
-    
+
     def get(self, request):
         user = request.user
         accounts = user.accounts.all()
@@ -319,16 +247,13 @@ class StatementOfAccountPDFView(generics.GenericAPIView):
             "name": f"{user.full_name}_statement_of_account_{timezone.localtime().strftime('%Y-%m-%d_%H-%M-%S')}.pdf",
             "type": "application/pdf",
         }]
-
-        html_content = render_to_string(
-            "statement_of_account.html",
-            {
+        context =  {
                 "user": user,
                 "start_date": start_date_str,
                 "end_date": end_date_str,
                 "company_name": "Longman Technologies",
-            }
-        )
+            } 
+        html_content = render_to_string("statement_of_account.html", context)
 
         to = [{"email": user.email, "name": user.full_name}]
         reply_to = {"email": os.getenv("REPLY_TO_EMAIL")}
@@ -339,7 +264,9 @@ class StatementOfAccountPDFView(generics.GenericAPIView):
         subject = "Your Statement of Account from Longman Technologies"
 
         send_attachment_email(to, reply_to, html_content, sender, subject, attachment)
-
-        return Response(
-            {"message": "Ledger PDF sent to your email."}, status=status.HTTP_200_OK
-        )
+        response_data = {
+            "status" : status.HTTP_200_OK,
+            "success" : True,
+            "message": "Requested account statement on its way to your registered email. Kindly check your inbox.",
+            }
+        return Response(response_data, status=status.HTTP_200_OK)

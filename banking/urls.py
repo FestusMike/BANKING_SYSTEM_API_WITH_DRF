@@ -3,8 +3,7 @@ from .views import (TransferAPIView,
                     UserTransactionListView, 
                     UserTransactionRetrieveView, 
                     StatementOfAccountPDFView, 
-                    TransactionImageView, 
-                    TransactionPdfView)
+                    TransactionImageView)
 
 urlpatterns = [
     path("transfer", TransferAPIView.as_view(), name="funds-transfer"),
@@ -18,11 +17,6 @@ urlpatterns = [
         "transactions/<int:transaction_id>/image",
         TransactionImageView.as_view(),
         name="transaction-image",
-    ),
-    path(
-        "transactions/<int:transaction_id>/pdf",
-        TransactionPdfView.as_view(),
-        name="transaction-pdf",
     ),
     path(
         "statement", 

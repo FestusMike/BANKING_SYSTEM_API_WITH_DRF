@@ -15,18 +15,17 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     date_of_birth = models.DateField(null=True)
     age = models.IntegerField(null=True, blank=True)
     address = models.CharField(max_length=50, blank=True, null=True)
-    otp = models.IntegerField(null=True, blank=True)
+    otp = models.CharField(null=True, unique=True, max_length=4)
     pin = models.CharField(null=True, max_length=255)
     profile_picture = models.ImageField(null=True, upload_to=profile_image_path)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-    is_admin = models.BooleanField(default=False)
-    has_sent_another_welcome_otp = models.BooleanField(default=False)
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now=True)
     last_logout = models.DateTimeField(null=True)
 
     USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['full_name']
 
     objects = CustomUserManager()
 
@@ -45,7 +44,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        if self.id and self.full_name: 
+        if self.full_name and not self.is_superuser: 
             return f"{self.id} - {self.full_name}"
         else:
-            return self.email
+            return f"{self.full_name} - Admin"
