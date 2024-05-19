@@ -14,9 +14,9 @@ from django.utils import timezone
 from PIL import Image
 from .utils import send_attachment_email
 from accounts.utils import send_email
-from .serializers import TransferSerializer, TransactionSerializer
+from .serializers import TransferSerializer, TransactionSerializer, AccountSerializer
 from .operations import transfer_funds
-from .models import Transaction, Ledger
+from .models import Transaction, Ledger, Account
 from .permissions import IsOwnerOfTransaction
 from .utils import generate_ledger_pdf
 import io
@@ -28,6 +28,47 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+class AccountInfoAPIView(generics.GenericAPIView):
+    """"
+    This view takes a mandatory 'account_number' as query parameter key and the account number as value.
+    If the param isn't provided, there will be a response body to alert the user of a missing param.
+    If the param is provided but does not exist, there will be a response body to alert the user of an invalid account number.
+    If the param is provided and the account number exists, the response body will the return the account number and the name of the account holder. 
+    """
+    serializer_class = AccountSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        account_number = request.query_params.get('account_number')
+        if not account_number:
+             return Response(
+                {
+                    "status": status.HTTP_400_BAD_REQUEST,
+                    "Success": False,
+                    "message": "Account Number is Required.",
+                },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        try:
+            account = Account.objects.get(account_number=account_number)
+        except Account.DoesNotExist:
+            return Response(
+                {
+                    "status": status.HTTP_404_NOT_FOUND,
+                    "Success": False,
+                    "message": "Invalid Account Number.",
+                },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        serializer = self.get_serializer(account)
+        return Response(
+                {
+                    "status": status.HTTP_200_OK,
+                    "Success": True,
+                    "message": serializer.data,
+                },
+                    status=status.HTTP_200_OK,
+                )
 
 class TransferAPIView(generics.GenericAPIView):
     serializer_class = TransferSerializer

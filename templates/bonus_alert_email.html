@@ -3,14 +3,15 @@
   <div class="container">
         <p>Hi, {{ recipient_name }}</p>
 
-        <p>Congratulations! We are pleased to inform you that a welcome bonus of 20,000.00 naira has been credited to your account. Your current balance is now {{current_balance|floatformat:2}}. Please check the transaction details below:</p>
+        <p>Congratulations on completing your registration as a customer. Your account number is {{account_number}}. You can start enjoying seamless transactions as a family member of Longman Technologies.  
+        <p>We are also pleased to inform you that a welcome bonus of 20,000.00 naira has been credited to your account. Your current balance is now {{current_balance|floatformat:2}}. Please check the transaction details below:</p>
 
         <div class="transaction-details">
             <p><strong>Amount:</strong>20,000.00</p>
             <p><strong>Description:</strong> {{ description }}</p>
             <p><strong>Date:</strong> {{ date }}</p>
         </div>
-        <p>We are excited to have you aboard. Welcome to the Longman family.</p>
+        <p>We are excited to have you aboard.</p>
         <p><strong>&copy; Longman Technologies</strong></p>
     </div>
 {% endblock %}

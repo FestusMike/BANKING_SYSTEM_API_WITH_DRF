@@ -6,7 +6,7 @@ from django.template.loader import render_to_string
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework import generics
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -511,6 +511,7 @@ class PasswordChangeAPIView(generics.GenericAPIView):
         user.otp = None
         user.save()
 
+
 class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
     """
     View for updating user profile information.
@@ -519,7 +520,7 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated, IsOwner]
     serializer_class = UserProfileUpdateSerializer
     authentication_classes = [JWTAuthentication]
-    parser_classes = [FormParser, MultiPartParser]
+    parser_classes = [FormParser, MultiPartParser, JSONParser]
 
     def get_object(self):
         return self.request.user
@@ -540,12 +541,15 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
             "message" : "Profile Updated Successfully",
             "data" : serializer.data
         }
-        return Response(response_data)
+        return Response(response_data, status=status.HTTP_200_OK)
 
     def perform_update(self, serializer):
         serializer.save()
 
 class UserDetailAPIView(generics.GenericAPIView):
+    """
+    View that allows a user to view their profile.
+    """
     serializer_class = UserDetailSerializer
     permission_classes = [IsAuthenticated, IsOwner]
 
@@ -561,3 +565,46 @@ class UserDetailAPIView(generics.GenericAPIView):
             'message': 'User details retrieved successfully',
             'data': serializer.data
         })
+    
+class AdminUserURDAPIView(generics.RetrieveUpdateDestroyAPIView):
+    from rest_framework.permissions import IsAdminUser
+    queryset = User.objects.all()
+    serializer_class = UserDetailSerializer
+    permission_classes = [IsAdminUser]
+    lookup_field = 'id'
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        response_data = {
+            'status': status.HTTP_200_OK,
+            'success' : True,
+            'message': 'User retrieved successfully',
+            'data': serializer.data
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        response_data = {
+            'status': status.HTTP_200_OK,
+            'success' : True,
+            'message': 'User updated successfully',
+            'data': serializer.data
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        response_data = {
+            'status': status.HTTP_204_NO_CONTENT,
+            'success' : True,
+            'message': 'User deleted successfully',
+        }
+        return Response(response_data, status=status.HTTP_204_NO_CONTENT)
+

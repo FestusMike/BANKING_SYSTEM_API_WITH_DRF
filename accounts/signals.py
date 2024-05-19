@@ -58,6 +58,7 @@ def send_welcome_bonus_alert(sender, instance, created, **kwargs):
             'recipient_name': instance.to_account.user.full_name, 
             'description' : instance.description,
             'current_balance' : instance.to_account.current_balance,
+            'account_number' : instance.to_account.account_number,
             'date' : instance.timestamp.strftime("%Y-%m-%d")
             }
 
