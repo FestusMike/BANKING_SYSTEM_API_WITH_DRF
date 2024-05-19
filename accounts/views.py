@@ -571,6 +571,7 @@ class AdminUserURDAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserDetailSerializer
     permission_classes = [IsAdminUser]
+    parser_classes = [FormParser, MultiPartParser, JSONParser]
     lookup_field = 'id'
 
     def retrieve(self, request, *args, **kwargs):
