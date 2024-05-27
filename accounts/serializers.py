@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from banking.models import Account
 from filetype import guess
 import re
 
@@ -12,10 +12,8 @@ class UserRegistrationSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_full_name(self, value):
-        if not re.match(r'^[a-zA-Z\s]+$', value):
-            raise ValidationError(
-            "Only alphabetical characters and spaces are allowed for the full name."
-        )
+        if not re.match("^[a-zA-Z\s]+$", value):
+            raise serializers.ValidationError("Only alphabetical characters and spaces are allowed for the full name.")
         return value
 
 class OTPVerificationSerializer(serializers.Serializer):
@@ -26,6 +24,11 @@ class NewOTPRequestSerializer(serializers.Serializer):
 
 class TransactionPinSerializer(serializers.Serializer):
     pin = serializers.CharField(max_length=4)
+
+    def validate_pin(self, value):
+        if not re.match("^[0-9]{4}$", value): 
+            raise serializers.ValidationError("PIN must be numeric and in four digits.")
+        return value
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -72,7 +75,6 @@ class PasswordChangeAuthenticatedSerializer(serializers.Serializer):
         self.password_equality(data)
         return data
 
-
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -105,20 +107,26 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Profile picture must be a JPEG or PNG image")
         return value
 
+class UserAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Account
+        fields = ["account_number"]
 
 class UserDetailSerializer(serializers.ModelSerializer):
+    accounts = UserAccountSerializer(many=True, read_only=True)
     class Meta:
         model = User
         fields = [
             "id",
             "full_name",
             "email",
+            "accounts",
             "date_of_birth",
             "phone_number",
             "address",
             "profile_picture",
             "is_staff",
             "is_active",
-            "is_superuser"
+            "date_created"
         ]
         extra_kwargs = {"id": {"read_only": True}}

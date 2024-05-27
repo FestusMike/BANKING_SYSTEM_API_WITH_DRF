@@ -1,6 +1,5 @@
 from .models import User
 from django.db.models.signals import post_save
-from django.contrib.auth.hashers import make_password
 from django.dispatch import receiver
 from django.template.loader import render_to_string
 from rest_framework import status

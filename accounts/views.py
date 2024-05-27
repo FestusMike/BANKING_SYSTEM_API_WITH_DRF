@@ -9,7 +9,7 @@ from rest_framework import generics
 from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from .permissions import IsOwner
 from .utils import GenerateOTP, send_email
 from .serializers import (
@@ -24,8 +24,11 @@ from .serializers import (
     UserDetailSerializer
 )
 from banking.models import Account, Transaction, Ledger
-import re
 import os
+import logging
+
+logger = logging.getLogger('user_activity')
+
 
 # Create your views here.
 
@@ -98,14 +101,13 @@ class ResendOTPAPIView(generics.GenericAPIView):
             }
             return Response(response_data, status=status.HTTP_404_NOT_FOUND)
 
-        otp_plain = GenerateOTP(length=4)
-        otp_hashed = make_password(otp_plain)
+        otp = GenerateOTP(length=4)
 
-        user.otp = otp_hashed
+        user.otp = otp
         user.save()
         
         subject = "Verify your email address."
-        context = {'full_name': user.full_name, 'otp': otp_plain}
+        context = {'full_name': user.full_name, 'otp': otp}
         
         message = render_to_string('otp_resend.html', context)
         
@@ -220,6 +222,7 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
         user.is_active = True
         user.last_login = timezone.now()
         user.save()
+        logger.debug(f"User: {user.id} - Password created for new user.")
 
         account = Account.objects.create(
             user=user, current_balance=20000.00, account_type="SAVINGS"
@@ -231,7 +234,7 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
             from_account=None,  
             to_account=account,
             amount=20000.00,
-            description="Welcome to the Longman Family. Enjoy your welcome bonus!",
+            description="Welcome! Enjoy your welcome bonus!",
         )
 
         Ledger.objects.create(
@@ -272,16 +275,6 @@ class TransactionPinCreateAPIView(generics.GenericAPIView):
         user = request.user
         pin = serializer.validated_data["pin"]
 
-        if not re.match("^[0-9]{4}$", pin):
-            return Response(
-                {
-                    "status": status.HTTP_400_BAD_REQUEST,
-                    "Success": False,
-                    "message": "PIN must be numeric and in four digits",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         user.pin = make_password(pin)
         user.save()
 
@@ -318,14 +311,12 @@ class LoginAPIView(generics.GenericAPIView):
             refresh_token = str(refresh)
             user.last_login = timezone.now()
             user.save()
-            accounts = user.accounts.all()
-            account_numbers = [account.account_number for account in accounts]
+            
             return Response(
                 {
                     "status": status.HTTP_200_OK,
                     "Success": True,
                     "message": "Login successful",
-                    "account_number" : account_numbers,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                 },
@@ -483,20 +474,21 @@ class PasswordChangeAPIView(generics.GenericAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         if request.user.is_authenticated:
-                password_serializer = PasswordChangeAuthenticatedSerializer(
-                    data=request.data, context={"user": user}
+            password_serializer = PasswordChangeAuthenticatedSerializer(
+                data=request.data, context={"user": user}
                 )
         else:
             password_serializer = PasswordSerializer(data=request.data)
 
         password_serializer.is_valid(raise_exception=True)
 
-        if "new_password1" in password_serializer.validated_data:
-             new_password = password_serializer.validated_data["new_password1"]
-        else:
+        if "new_password1" in password_serializer.validated_data: 
+            new_password = password_serializer.validated_data["new_password1"]
+        else: 
             new_password = password_serializer.validated_data["password1"]
 
         self.change_password(user, new_password)
+        logger.debug(f"User: {user.id} - Password changed.")
         return Response(
                 {
                     "status": status.HTTP_200_OK,
@@ -536,6 +528,7 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
+        logger.debug(f"User: {instance.id} - Profile updated.")
         response_data = {
             "status" : status.HTTP_200_OK,
             "message" : "Profile Updated Successfully",
@@ -565,9 +558,27 @@ class UserDetailAPIView(generics.GenericAPIView):
             'message': 'User details retrieved successfully',
             'data': serializer.data
         })
-    
+
+class UsersListAPIView(generics.ListAPIView):
+    from rest_framework.pagination import PageNumberPagination
+    queryset = User.objects.all().order_by("-date_created")
+    permission_classes = [IsAdminUser]
+    serializer_class = UserDetailSerializer
+    pagination_class = PageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        paginator = self.pagination_class()
+        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = self.get_serializer(paginated_queryset, many=True)
+        response_data = {
+            'status' : status.HTTP_200_OK,
+            'success' : True,
+            'data' : serializer.data
+            }
+        return paginator.get_paginated_response(response_data)
+        
 class AdminUserURDAPIView(generics.RetrieveUpdateDestroyAPIView):
-    from rest_framework.permissions import IsAdminUser
     queryset = User.objects.all()
     serializer_class = UserDetailSerializer
     permission_classes = [IsAdminUser]
@@ -608,4 +619,3 @@ class AdminUserURDAPIView(generics.RetrieveUpdateDestroyAPIView):
             'message': 'User deleted successfully',
         }
         return Response(response_data, status=status.HTTP_204_NO_CONTENT)
-
