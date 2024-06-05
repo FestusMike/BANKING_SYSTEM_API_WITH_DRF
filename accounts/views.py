@@ -222,7 +222,7 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
         user.is_active = True
         user.last_login = timezone.now()
         user.save()
-        logger.debug(f"User: {user.id} - Password created for new user.")
+        logger.debug(f"User: {user.email} - Password created for new user.")
 
         account = Account.objects.create(
             user=user, current_balance=20000.00, account_type="SAVINGS"
@@ -339,9 +339,10 @@ class LoginAPIView(generics.GenericAPIView):
             }
             return Response(response_data, status=status.HTTP_401_UNAUTHORIZED)
 
+
 class UserLogoutAPIView(generics.GenericAPIView):
     """
-    This View blacklists the refresh token, thereby logging out the user.
+    This View blacklists the refresh token and access token, thereby logging out the user.
     """
 
     permission_classes = [IsAuthenticated]
@@ -359,7 +360,7 @@ class UserLogoutAPIView(generics.GenericAPIView):
             if not refresh_token:
                 raise Exception("Refresh token not provided")
             token = RefreshToken(refresh_token)
-            token.blacklist()
+            token.blacklist()       
 
             user = request.user
             user.last_logout = timezone.now()
@@ -374,7 +375,7 @@ class UserLogoutAPIView(generics.GenericAPIView):
             response_data = {
                 "status": status.HTTP_400_BAD_REQUEST,
                 "Success": False,
-                "message": "Logout not successful",
+                "message": f"Logout not successful because {e}",
             }
             return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
 
@@ -488,7 +489,7 @@ class PasswordChangeAPIView(generics.GenericAPIView):
             new_password = password_serializer.validated_data["password1"]
 
         self.change_password(user, new_password)
-        logger.debug(f"User: {user.id} - Password changed.")
+        logger.debug(f"User: {user.email} - Password changed.")
         return Response(
                 {
                     "status": status.HTTP_200_OK,
@@ -528,7 +529,7 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
-        logger.debug(f"User: {instance.id} - Profile updated.")
+        logger.debug(f"User: {instance.email} - Profile updated.")
         response_data = {
             "status" : status.HTTP_200_OK,
             "message" : "Profile Updated Successfully",
