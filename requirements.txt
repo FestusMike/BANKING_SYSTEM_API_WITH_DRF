@@ -1,9 +1,15 @@
+cloudinary==1.38.0
 Django==5.0.2
 djangorestframework_simplejwt==5.3.1
+djangorestframework==3.14.0
 drf_yasg==1.21.7
 filetype==1.2.0
+gunicorn==21.2.0
 Pillow==10.3.0
 python-dotenv==1.0.1
+psycopg2-binary==2.9.5
 reportlab==4.0.9
 Requests==2.32.3
 sib_api_v3_sdk==7.6.0
+virtualenv==20.25.0
+whitenoise==6.6.0
