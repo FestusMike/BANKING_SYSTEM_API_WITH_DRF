@@ -1,8 +1,8 @@
+accounts/middleware.py
 .env
 db.sqlite3
 junk.json
 2-lane 2-way ahead.jpg
 staticfiles/
-user_activity.log
 */__pycache__/*
 */migrations/*

@@ -25,9 +25,6 @@ from .serializers import (
 )
 from banking.models import Account, Transaction, Ledger
 import os
-import logging
-
-logger = logging.getLogger('user_activity')
 
 
 # Create your views here.
@@ -222,7 +219,6 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
         user.is_active = True
         user.last_login = timezone.now()
         user.save()
-        logger.debug(f"User: {user.email} - Password created for new user.")
 
         account = Account.objects.create(
             user=user, current_balance=20000.00, account_type="SAVINGS"
@@ -489,7 +485,6 @@ class PasswordChangeAPIView(generics.GenericAPIView):
             new_password = password_serializer.validated_data["password1"]
 
         self.change_password(user, new_password)
-        logger.debug(f"User: {user.email} - Password changed.")
         return Response(
                 {
                     "status": status.HTTP_200_OK,
@@ -529,7 +524,6 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
-        logger.debug(f"User: {instance.email} - Profile updated.")
         response_data = {
             "status" : status.HTTP_200_OK,
             "message" : "Profile Updated Successfully",
