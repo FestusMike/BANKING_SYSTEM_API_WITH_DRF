@@ -47,7 +47,8 @@ class PasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError("Passwords don't match")
         return data
 
-class PasswordChangeAuthenticatedSerializer(serializers.Serializer):
+class DeliberatePasswordChangeSerializer(serializers.Serializer):
+    otp = serializers.CharField()
     old_password = serializers.CharField(write_only=True)
     new_password1 = serializers.CharField(write_only=True)
     new_password2 = serializers.CharField(write_only=True)

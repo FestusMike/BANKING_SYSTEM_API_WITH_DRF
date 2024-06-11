@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     "accounts.apps.AccountsConfig",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
-    "drf_yasg",
+    "drf_spectacular",
     "cloudinary_storage",
     "cloudinary",
 ]
@@ -130,7 +130,20 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-        "PAGE_SIZE" : 10
+        "PAGE_SIZE" : 10,
+    "DEFAULT_SCHEMA_CLASS" : "drf_spectacular.openapi.AutoSchema",
+    
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Banking System API',
+    'DESCRIPTION': 
+    """
+    The API is developed and maintained by Micheal Arifajogun,a software engineer,as a portfolio project for knowledge acquisition and skill enhancement.\n 
+    It embodies core banking functionalities such as secure user authentication, intra-bank transfer, expedient email transaction alerts,\n
+    generation of transaction receipt; in json and image, and generation of bank statement with or without date range filter.
+    """,
+    'VERSION': '1.0.0',
 }
 
 

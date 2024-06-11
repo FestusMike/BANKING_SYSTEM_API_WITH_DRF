@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import make_password
 from django.template.loader import render_to_string
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework import generics
@@ -10,6 +11,7 @@ from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.exceptions import MethodNotAllowed
 from .permissions import IsOwner
 from .utils import GenerateOTP, send_email
 from .serializers import (
@@ -19,7 +21,7 @@ from .serializers import (
     TransactionPinSerializer,
     LoginSerializer,
     PasswordSerializer,
-    PasswordChangeAuthenticatedSerializer,
+    DeliberatePasswordChangeSerializer,
     UserProfileUpdateSerializer,
     UserDetailSerializer
 )
@@ -31,16 +33,51 @@ import os
 
 User = get_user_model()
 
-
 class UserRegistrationAPIView(generics.GenericAPIView):
     """
-    This View registers a new user based on their full name and email address.
-    When a user registers, their data is first saved in the database, and an OTP is sent
+    This view registers a new user based on their full name and email address.\n
+    When a user registers, their data is first saved in the database, and an OTP is sent\n
     to verify their entered e-mail address.
     """
 
     serializer_class = UserRegistrationSerializer
-
+    @extend_schema(
+    request=UserRegistrationSerializer,
+    responses={
+        201: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+                "data": {
+                    "type": "object",
+                    "properties" : {
+                        "full_name" :{"type" : "string"},
+                        "email" :{"type" : "string"} 
+                    }                    
+                    },
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        500: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+    },
+    methods=["POST"],
+    )      
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -72,11 +109,50 @@ class UserRegistrationAPIView(generics.GenericAPIView):
 
 class ResendOTPAPIView(generics.GenericAPIView):
     """
-    This View resends an account verification OTP, incase a user's OTP expires.
+    This view resends an account verification OTP, incase a user's OTP expires.\n
+    The user is expected to enter their registered email so they can get a new 4-digit OTP.\n
     """
 
     serializer_class = NewOTPRequestSerializer
-
+    
+    @extend_schema(
+    request=NewOTPRequestSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        404: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        500: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        }
+    },
+    methods=["POST"],
+    ) 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -138,12 +214,50 @@ class ResendOTPAPIView(generics.GenericAPIView):
 
 class OTPVerificationAPIView(generics.GenericAPIView):
     """
-    This View confirms the OTP sent to the user's email address. If the user's OTP is valid
-    and isn't more than 10 minutes of validity, it will be verified, and they will be allowed to proceed with password setup.
+    This view confirms the OTP sent to the user's email address. If the user's OTP is valid\n
+    and isn't more than 10 minutes of validity, it will be verified, and they will be allowed to proceed with password setup.\n
     """
 
     serializer_class = OTPVerificationSerializer
 
+    @extend_schema(
+    request=OTPVerificationSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        404: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        500: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        }
+    },
+    methods=["POST"],
+    ) 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -178,17 +292,49 @@ class OTPVerificationAPIView(generics.GenericAPIView):
                 },
                 status=status.HTTP_200_OK,
             )
-            
-                
+           
 class PasswordSetUpAPIView(generics.GenericAPIView):
     """
-    This View allows a user whose OTP has been verified to create a password.
-    Once the password is created, their account becomes verified and they become
-    a bona fide bank customer.
+    This view allows a user whose OTP has been verified to create a password.\n
+    Once the password is created, their account becomes verified and they become\n
+    a bona fide bank customer. They also get a welcome token of 20,000 naira.\n 
+    Generous! Isn't it?
     """
-
     serializer_class = PasswordSerializer
-
+    
+    @extend_schema(
+    request=PasswordSerializer,
+    responses={
+        201: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+                "account_number": {"type": "string"},
+                "access_token": {"type": "string"},
+                "refresh_token": {"type": "string"},
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        404: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+    },
+    methods=["POST"],
+    ) 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -257,13 +403,35 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
 
 class TransactionPinCreateAPIView(generics.GenericAPIView):
     """
-    This View allows a verified user to create a 4-digit transaction pin.
+    This view allows a verified user to create a 4-digit transaction pin.
     """
 
     serializer_class = TransactionPinSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
+    @extend_schema(
+    request=TransactionPinSerializer,
+    responses={
+        201: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        }
+    },
+    methods=["POST"],
+    ) 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -285,13 +453,37 @@ class TransactionPinCreateAPIView(generics.GenericAPIView):
 
 class LoginAPIView(generics.GenericAPIView):
     """
-    This View allows a user to login based on their e-mail and password. If these login params
-    are valid, they will be provided with an access and a refresh token, which will be included
+    This view allows a user to login based on their e-mail and password. If these login params\n
+    are valid, they will be provided with an access and a refresh token, which will be included\n
     in the header in every API call that requires authentication.
     """
 
     serializer_class = LoginSerializer
 
+    @extend_schema(
+    request=LoginSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+                "access_token": {"type": "string"},
+                "refresh_token": {"type": "string"},
+            },
+        },
+        401: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+    },
+    methods=["POST"],
+    )
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -338,18 +530,23 @@ class LoginAPIView(generics.GenericAPIView):
 
 class UserLogoutAPIView(generics.GenericAPIView):
     """
-    This View blacklists the refresh token and access token, thereby logging out the user.
+    This View blacklists the refresh token, consequently preventing a user from generating a new\n
+    access token until they are re-authenticated.
     """
-
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
     def get_serializer_class(self):
-        from rest_framework.serializers import BaseSerializer
-        if getattr(self, 'swagger_fake_view', False):
-            return BaseSerializer
         return None
     
+    @extend_schema(
+    responses={
+        200: {"description": "Log out successful"},
+        400: {"description": "Log out not successful"}
+    },
+    request=None,
+    methods=["POST"]
+    )     
     def post(self, request, *args, **kwargs):
         try:
             refresh_token = request.data.get("refresh")
@@ -375,7 +572,13 @@ class UserLogoutAPIView(generics.GenericAPIView):
             }
             return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
 
+
 class PasswordChangeOTPAPIView(generics.GenericAPIView):
+    """
+    This view allows a user to generate a password reset OTP. If the user is authenticated,\n
+    the OTP is sent directly to the user's registered e-mail. Otherwise, they will be required\n
+    to provide to provide their registered e-mail, so they can receive the OTP.
+    """
     permission_classes = [AllowAny]
     serializer_class = NewOTPRequestSerializer
     authentication_classes = [JWTAuthentication]
@@ -435,16 +638,45 @@ class PasswordChangeOTPAPIView(generics.GenericAPIView):
             }
             return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class PasswordChangeAPIView(generics.GenericAPIView):
+class ForgottenPasswordResetAPIView(generics.GenericAPIView):
     """
-    View for changing the password after OTP verification for users who forgot their password
-    and logged in users who want to change their password.
+    This view is for users who have forgotten their passwords. They will be prompted to input their\n
+    otp, new password, and new password confirmation. Immediately these inputs are verified as valid,\n
+    they will be allowed to login with their new password.
     """
-
-    serializer_class = OTPVerificationSerializer
+    serializer_class = PasswordSerializer
     permission_classes = [AllowAny]
-    authentication_classes = [JWTAuthentication]
 
+    @extend_schema(
+    request=PasswordSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        404: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+    },
+    methods=["POST"],
+    )
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -470,21 +702,9 @@ class PasswordChangeAPIView(generics.GenericAPIView):
                 },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        if request.user.is_authenticated:
-            password_serializer = PasswordChangeAuthenticatedSerializer(
-                data=request.data, context={"user": user}
-                )
-        else:
-            password_serializer = PasswordSerializer(data=request.data)
 
-        password_serializer.is_valid(raise_exception=True)
+        self.reset_forgotten_password(request, user)
 
-        if "new_password1" in password_serializer.validated_data: 
-            new_password = password_serializer.validated_data["new_password1"]
-        else: 
-            new_password = password_serializer.validated_data["password1"]
-
-        self.change_password(user, new_password)
         return Response(
                 {
                     "status": status.HTTP_200_OK,
@@ -494,6 +714,100 @@ class PasswordChangeAPIView(generics.GenericAPIView):
                 status=status.HTTP_200_OK,
             )
 
+    def reset_forgotten_password(self, request, user):
+        serializer = PasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        new_password = serializer.validated_data["password1"]
+        self.change_password(user, new_password)
+
+    def change_password(self, user, new_password):
+        user.set_password(new_password)
+        user.otp = None
+        user.save()
+
+class DeliberatePasswordResetAPIView(generics.GenericAPIView):
+    """
+    Unlike the ForgottenPasswordResetAPIView, this view allows only authenticated users to change their password.\n
+    A more nuanced explanation is that a user didn't forget their password, but they feel like changing it for reasons\n
+    best personal to them. Hence, they will be required to provide their old password before they can proceed.
+    """
+    serializer_class = DeliberatePasswordChangeSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    @extend_schema(
+    request=DeliberatePasswordChangeSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        404: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+    },
+    methods=["POST"],
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        otp = serializer.validated_data["otp"]
+        try:
+            user = User.objects.get(otp=otp)
+        except User.DoesNotExist:
+            return Response(
+                {
+                    "status": status.HTTP_404_NOT_FOUND,
+                    "Success": False,
+                    "message": "Invalid OTP",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if user.date_updated + timedelta(minutes=10) < timezone.now():
+            return Response(
+                {
+                    "status": status.HTTP_400_BAD_REQUEST,
+                    "Success": False,
+                    "message": "OTP has expired. Kindly request another.",
+                },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        self.deliberate_password_reset(request, user)
+
+        return Response(
+                {
+                    "status": status.HTTP_200_OK,
+                    "Success": True,
+                    "message": "Password changed successfully",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+    def deliberate_password_reset(self, request, user):
+        serializer = DeliberatePasswordChangeSerializer(data=request.data, context={"user": user})
+        serializer.is_valid(raise_exception=True)
+        new_password = serializer.validated_data["new_password1"]
+        self.change_password(user, new_password)
+
     def change_password(self, user, new_password):
         user.set_password(new_password)
         user.otp = None
@@ -502,9 +816,8 @@ class PasswordChangeAPIView(generics.GenericAPIView):
 
 class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
     """
-    View for updating user profile information.
+    This view allows a user to update their information.
     """
-
     permission_classes = [IsAuthenticated, IsOwner]
     serializer_class = UserProfileUpdateSerializer
     authentication_classes = [JWTAuthentication]
@@ -517,7 +830,15 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
+    @extend_schema(
+    responses={
+        200: UserProfileUpdateSerializer,
+        400: {"description": "Bad request"},
+        401: {"description": "Unauthorized"},
+        500: {"description": "Internal server error"}
+    },
+    methods=["PUT", "PATCH"]
+    )
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
@@ -534,16 +855,27 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
     def perform_update(self, serializer):
         serializer.save()
 
+    def get(self, request, *args, **kwargs):
+        raise MethodNotAllowed("GET")
+
 class UserDetailAPIView(generics.GenericAPIView):
     """
-    View that allows a user to view their profile.
+    This view allows a user to only view their profile.
     """
     serializer_class = UserDetailSerializer
     permission_classes = [IsAuthenticated, IsOwner]
 
     def get_object(self):
         return self.request.user
-    
+
+    @extend_schema(
+    responses={
+        200: UserDetailSerializer,
+        400: {"description" : "Bad Request"},
+        500: {"description": "Internal server error"},
+    },
+    methods=["GET"],
+    )    
     def get(self, request):
         instance  = self.get_object()
         serializer = self.get_serializer(instance)
@@ -553,14 +885,31 @@ class UserDetailAPIView(generics.GenericAPIView):
             'message': 'User details retrieved successfully',
             'data': serializer.data
         })
+ 
 
 class UsersListAPIView(generics.ListAPIView):
+    """
+    This view allows an admin to fetch a list of all the users in the database, in descending order.\n 
+    To speed up the database query, a query parameter ('page') can be appended to the url and the value\n 
+    can be set to any page number, commonly starting from one.
+    """
     from rest_framework.pagination import PageNumberPagination
     queryset = User.objects.all().order_by("-date_created")
     permission_classes = [IsAdminUser]
     serializer_class = UserDetailSerializer
     pagination_class = PageNumberPagination
 
+    @extend_schema(
+    responses={
+        200: UserDetailSerializer(many=True),
+        401: {"description" : "Unauthorized"},
+        500: {"description": "Internal server error"},
+    },
+    methods=["GET"],
+    parameters=[
+        OpenApiParameter(name="page", description="Page number", required=False, type=int),
+    ],
+    )
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         paginator = self.pagination_class()
@@ -573,7 +922,22 @@ class UsersListAPIView(generics.ListAPIView):
             }
         return paginator.get_paginated_response(response_data)
         
-class AdminUserURDAPIView(generics.RetrieveUpdateDestroyAPIView):
+@extend_schema(
+    responses={
+        200: UserDetailSerializer,
+        400: {"description": "Bad request"},
+        401: {"description": "Unauthorized"},
+        404: {"description": "Not found"},
+        500: {"description": "Internal server error"}
+    },
+    methods=["GET", "PUT", "PATCH", "DELETE"],
+)
+
+class AdminUserRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    This view authorizes only an admin to perform Read, Update, and Delete operations\n
+    on a user, simply by fetching the user's id.
+    """
     queryset = User.objects.all()
     serializer_class = UserDetailSerializer
     permission_classes = [IsAdminUser]

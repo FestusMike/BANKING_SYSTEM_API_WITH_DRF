@@ -15,7 +15,7 @@ class AccountSerializer(serializers.ModelSerializer):
         model = Account
         fields = ["account_number", "user"]
 
-    def get_user(self, obj):
+    def get_user(self, obj) -> str:
         return obj.user.full_name
 
 class TransactionSerializer(serializers.ModelSerializer):
@@ -25,3 +25,6 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = "__all__"
+
+class TransactionImageSerializer(serializers.Serializer):
+    pass

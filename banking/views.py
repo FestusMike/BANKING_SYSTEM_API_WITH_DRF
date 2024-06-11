@@ -2,7 +2,6 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.serializers import BaseSerializer
 from rest_framework.pagination import PageNumberPagination
 from django.http import HttpResponse
 from django.contrib.auth import get_user_model
@@ -11,10 +10,11 @@ from django.template.loader import render_to_string
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import make_aware
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from PIL import Image
 from .utils import send_attachment_email
 from accounts.utils import send_email
-from .serializers import TransferSerializer, TransactionSerializer, AccountSerializer
+from .serializers import TransferSerializer, TransactionSerializer, AccountSerializer, TransactionImageSerializer
 from .operations import transfer_funds
 from .models import Transaction, Ledger, Account
 from .permissions import IsOwnerOfTransaction
@@ -28,16 +28,27 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+
 class AccountInfoAPIView(generics.GenericAPIView):
-    """"
-    This view takes a mandatory 'account_number' as query parameter key and the account number as value.
-    If the param isn't provided, there will be a response body to alert the user of a missing param.
-    If the param is provided but does not exist, there will be a response body to alert the user of an invalid account number.
-    If the param is provided and the account number exists, the response body will the return the account number and the name of the account holder. 
     """
+    This view handles provides the details of a verified user based on a valid account number\n 
+    provided in the query parameter. An explicit explanation is that a user has the account number\n
+    of another user but they want to verify their details. This view comes in handy for such use case.
+    """    
     serializer_class = AccountSerializer
     permission_classes = [IsAuthenticated]
-
+    
+    @extend_schema(
+    parameters=[
+        OpenApiParameter(name="account_number", description="Account Number", required=True, type=str),
+    ],
+    responses={
+        200: AccountSerializer,
+        400: {"description": "Account Number is Required"},
+        404: {"description": "Invalid Account Number"},
+    },
+    methods=["GET"]
+    )
     def get(self, request, *args, **kwargs):
         account_number = request.query_params.get('account_number')
         if not account_number:
@@ -70,10 +81,40 @@ class AccountInfoAPIView(generics.GenericAPIView):
                     status=status.HTTP_200_OK,
                 )
 
+
 class TransferAPIView(generics.GenericAPIView):
+    """
+    This view handles funds transfer between two verified users. A user sends funds to a fellow user\n
+    and their accounts both get debited and credited immediately. The two users involved in the transaction also get\n
+    email alerts immediately after successful transaction.
+    """
     serializer_class = TransferSerializer
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+    request=TransferSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+                "transaction_id": {"type": "string"},
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+       
+        },
+    methods=["POST"],
+)    
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -176,6 +217,11 @@ class TransferAPIView(generics.GenericAPIView):
 
 
 class UserTransactionListView(generics.ListAPIView):
+    """
+    This view allows a user to fetch all the transactions they are invloved in.\n
+    To speed up database query, a query parameter('page') may be appended to the url\n
+    and the value can be any digit, commonly starting from one.
+    """
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated, IsOwnerOfTransaction]
     pagination_class = PageNumberPagination
@@ -195,6 +241,18 @@ class UserTransactionListView(generics.ListAPIView):
         transactions = debit_transactions | credit_transactions
         return transactions.order_by("-timestamp")
 
+    @extend_schema(
+        responses={
+        200: TransactionSerializer(many=True),
+        500: {"description": "Internal Server Error"},
+    },
+        methods=["GET"],
+        parameters=[
+        OpenApiParameter(
+            name="page", description="Page number", required=False, type=int
+        ),
+    ],
+    )
     def list(self, request, *args, **kwargs):
         try:
             queryset = self.get_queryset()
@@ -221,6 +279,10 @@ class UserTransactionListView(generics.ListAPIView):
             )
 
 class UserTransactionRetrieveView(generics.RetrieveAPIView):
+    """
+    This view allows a user to fetch a particular transaction they are involved in\n 
+    by appending the transaction id to the url as a parameter. 
+    """
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated, IsOwnerOfTransaction]
     queryset = Transaction.objects.all()
@@ -228,21 +290,21 @@ class UserTransactionRetrieveView(generics.RetrieveAPIView):
 
 
 class TransactionImageView(generics.RetrieveAPIView):
+    """
+    This view allows a user to get the image(jpeg format) of a transaction they are\n
+    involved in by simply appending the transaction id to the url as a parameter.
+    """
+    serializer_class = TransactionImageSerializer
     permission_classes = [IsAuthenticated, IsOwnerOfTransaction]
     queryset = Transaction.objects.all()
     lookup_field = "transaction_id"
-
-    def get_serializer_class(self):
-        if getattr(self, "swagger_fake_view", False):
-            return BaseSerializer
-        return None
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         image = self.generate_image(instance)
         return HttpResponse(image, content_type="image/jpeg")
 
-    def generate_image(self, transaction):
+    def generate_image(self, instance):
         img = Image.new("RGB", (100, 50), color="white")
         img_byte_array = io.BytesIO()
         img.save(img_byte_array, format="JPEG")
@@ -250,13 +312,28 @@ class TransactionImageView(generics.RetrieveAPIView):
 
 
 class StatementOfAccountPDFView(generics.GenericAPIView):
+    """
+    This view gives room for a user to generate an account statement which will be immediately\n
+    sent to their email. A user can generate account records for all their transactions or for\n
+    transactions within a specific timeframe. To generate transaction records for a specific timeframe,\n
+    a user can append two query parameters to the url('start_date', 'end_date') with the two parameters\n
+    taking date values in YYYY-MM-DD format.\n 
+    Example: api/v1/statement-of-account?start_date=2024-06-11&end_date=2024-06-11\n
+    To generate account statement for all transactions, no query parameter is needed.
+    """
     permission_classes = [IsAuthenticated]
 
-    def get_serializer_class(self):
-        if getattr(self, 'swagger_fake_view', False):
-            return BaseSerializer
-        return None
-
+    @extend_schema(
+    parameters=[
+        OpenApiParameter(name="start_date", description="Start date", required=False, type=str),
+        OpenApiParameter(name="end_date", description="End date", required=False, type=str),
+    ],
+    responses={
+        200: {"description": "Statement of account sent successfully"},
+        400: {"description": "Invalid date format provided"},
+    },
+    methods=["GET"]
+    )    
     def get(self, request):
         user = request.user
         accounts = user.accounts.all()
