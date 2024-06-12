@@ -770,17 +770,18 @@ class DeliberatePasswordResetAPIView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
 
         otp = serializer.validated_data["otp"]
-        try:
-            user = User.objects.get(otp=otp)
-        except User.DoesNotExist:
+        user = request.user
+
+        if otp != user.otp:
             return Response(
-                {
-                    "status": status.HTTP_404_NOT_FOUND,
-                    "Success": False,
-                    "message": "Invalid OTP",
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
+                    {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "Success": False,
+                "message": "Invalid OTP"
+            },
+                status=status.HTTP_400_BAD_REQUEST
+                )
+
         if user.date_updated + timedelta(minutes=10) < timezone.now():
             return Response(
                 {
@@ -791,28 +792,25 @@ class DeliberatePasswordResetAPIView(generics.GenericAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        self.deliberate_password_reset(request, user)
-
-        return Response(
-                {
-                    "status": status.HTTP_200_OK,
-                    "Success": True,
-                    "message": "Password changed successfully",
-                },
-                status=status.HTTP_200_OK,
-            )
-
-    def deliberate_password_reset(self, request, user):
-        serializer = DeliberatePasswordChangeSerializer(data=request.data, context={"user": user})
-        serializer.is_valid(raise_exception=True)
+        if not user.check_password(serializer.validated_data["old_password"]):
+            return Response(
+                {"status": status.HTTP_400_BAD_REQUEST,
+                 "Success": False,
+                 "message": "Incorrect old password"},
+                status=status.HTTP_400_BAD_REQUEST)
+        
         new_password = serializer.validated_data["new_password1"]
-        self.change_password(user, new_password)
-
-    def change_password(self, user, new_password):
         user.set_password(new_password)
-        user.otp = None
         user.save()
 
+        return Response(
+            {
+                "status": status.HTTP_200_OK,
+                "Success": True,
+                "message": "Password changed successfully",
+            },
+            status=status.HTTP_200_OK,
+        )
 
 class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
     """

@@ -47,22 +47,25 @@ class PasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError("Passwords don't match")
         return data
 
+
 class DeliberatePasswordChangeSerializer(serializers.Serializer):
     otp = serializers.CharField()
     old_password = serializers.CharField(write_only=True)
     new_password1 = serializers.CharField(write_only=True)
     new_password2 = serializers.CharField(write_only=True)
 
-    def validate_old_password(self, value):
-        user = self.context.get("user")
-        if not user.check_password(value):
-            raise serializers.ValidationError("Incorrect old password")
+    def validate_otp(self, value):
+        if not value:
+            raise serializers.ValidationError("OTP isn't provided")
+        try:
+            user = User.objects.get(otp=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid OTP")
         return value
 
-    def validate_new_password(self, value):
-        if not value:
-            raise serializers.ValidationError("New password cannot be empty")
-        return value
+    def validate(self, data):
+        self.password_equality(data)
+        return data
 
     def password_equality(self, data):
         new_password1 = data.get("new_password1")
@@ -72,9 +75,6 @@ class DeliberatePasswordChangeSerializer(serializers.Serializer):
             raise serializers.ValidationError("Passwords don't match")
         return data
 
-    def validate(self, data):
-        self.password_equality(data)
-        return data
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
