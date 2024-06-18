@@ -128,6 +128,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "profile_picture",
             "is_staff",
             "is_active",
-            "date_created"
+            "date_created",
+            "date_updated"
         ]
         extra_kwargs = {"id": {"read_only": True}}

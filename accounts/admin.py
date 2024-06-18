@@ -97,5 +97,6 @@ class CustomUserAdmin(UserAdmin):
     ordering = ("-date_created",)
 
 
+
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(LogEntry, LogEntryAdmin)

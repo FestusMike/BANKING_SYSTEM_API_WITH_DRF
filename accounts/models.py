@@ -8,7 +8,6 @@ from .managers import CustomUserManager
 # Create your models here.
 
 class User(AbstractBaseUser, PermissionsMixin, BaseModel):
-   
     full_name = models.CharField(max_length=255, null=False)
     email = models.EmailField(unique=True, blank=False, null=False)
     phone_number = models.CharField(max_length=20, blank=True, null=True)

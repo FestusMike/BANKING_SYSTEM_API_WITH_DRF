@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "banking.apps.BankingConfig",
     "accounts.apps.AccountsConfig",
+    "messaging.apps.MessagingConfig",
+    "adminuser.apps.AdminUserConfig",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",

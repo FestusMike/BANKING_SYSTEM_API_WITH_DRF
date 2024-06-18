@@ -3,7 +3,6 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework import status
-
 User = get_user_model()
 
 class TestUserRegistrationAPIView(TestCase):
@@ -79,3 +78,40 @@ class TestOTPVerificationAPIView(TestCase):
         self.assertEqual(response.data["status"], status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["Success"], False)
         self.assertEqual(response.data["message"], "OTP is required")
+
+class TestPasswordSetUpAPIView(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(email="test@example.com", otp="1234")
+
+    def test_password_setup_success(self):
+        data = {"otp": "1234", "password1": "password123", "password2": "password123"}
+        response = self.client.post("/api/v1/auth/password-setup", data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["status"], status.HTTP_201_CREATED)
+        self.assertEqual(response.data["Success"], True)
+        self.assertEqual(response.data["message"], "Password set successfully and account creation complete. A token of 20,000.00 naira has been credited to your account as a welcome bonus.")
+
+    def test_password_setup_failure_invalid_otp(self):
+        data = {"otp": "6543", "password1": "password123", "password2": "password123"}
+        response = self.client.post("/api/v1/auth/password-setup", data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["status"], status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["Success"], False)
+        self.assertEqual(response.data["message"], "Invalid OTP")
+
+    def test_password_setup_failure_expired_otp(self):
+        self.user.date_updated = timezone.now() - timedelta(minutes=15)
+        self.user.save()
+        data = {"otp": "1234", "password1": "password123", "password2": "password123"}
+        response = self.client.post("/api/v1/auth/password-setup", data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["status"], status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["Success"], False)
+        self.assertEqual(response.data["message"], "OTP has expired. Kindly request another.")
+
+    def test_password_setup_failure_password_mismatch(self):
+        data = {"otp": "1234", "password1": "password123", "password2": "password456"}
+        response = self.client.post("/api/v1/auth/password-setup", data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+

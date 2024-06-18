@@ -1,4 +1,5 @@
 import random
+import uuid
 from django.utils import timezone
 from django.db import models
 from utils.snowflake import Snowflake
@@ -33,6 +34,11 @@ def generate_transaction_id():
 
     return transaction_id_str
 
+def generate_reference_id():
+    """Generates an 16-character alphanumeric reference id """
+    unique_id = str(uuid.uuid4()).replace('-', '')[:16]
+    primary_key = '-'.join([unique_id[i:i+4] for i in range(0, 16, 4)])
+    return primary_key.upper()
 
 class BaseModel(models.Model):
     """Base model with id attribute for all models requiring a snowflake id"""
@@ -45,3 +51,4 @@ class BaseModel(models.Model):
 
     class Meta:
         abstract = True
+

@@ -3,16 +3,15 @@ from django.utils import timezone
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import make_password
 from django.template.loader import render_to_string
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import MethodNotAllowed
-from .permissions import IsOwner
 from .utils import GenerateOTP, send_email
 from .serializers import (
     UserRegistrationSerializer,
@@ -23,7 +22,7 @@ from .serializers import (
     PasswordSerializer,
     DeliberatePasswordChangeSerializer,
     UserProfileUpdateSerializer,
-    UserDetailSerializer
+    UserDetailSerializer,
 )
 from banking.models import Account, Transaction, Ledger
 import os
@@ -292,7 +291,7 @@ class OTPVerificationAPIView(generics.GenericAPIView):
                 },
                 status=status.HTTP_200_OK,
             )
-           
+
 class PasswordSetUpAPIView(generics.GenericAPIView):
     """
     This view allows a user whose OTP has been verified to create a password.\n
@@ -816,7 +815,7 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
     """
     This view allows a user to update their information.
     """
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated]
     serializer_class = UserProfileUpdateSerializer
     authentication_classes = [JWTAuthentication]
     parser_classes = [FormParser, MultiPartParser, JSONParser]
@@ -861,7 +860,7 @@ class UserDetailAPIView(generics.GenericAPIView):
     This view allows a user to only view their profile.
     """
     serializer_class = UserDetailSerializer
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated]
 
     def get_object(self):
         return self.request.user
@@ -883,96 +882,5 @@ class UserDetailAPIView(generics.GenericAPIView):
             'message': 'User details retrieved successfully',
             'data': serializer.data
         })
- 
 
-class UsersListAPIView(generics.ListAPIView):
-    """
-    This view allows an admin to fetch a list of all the users in the database, in descending order.\n 
-    To speed up the database query, a query parameter ('page') can be appended to the url and the value\n 
-    can be set to any page number, commonly starting from one.
-    """
-    from rest_framework.pagination import PageNumberPagination
-    queryset = User.objects.all().order_by("-date_created")
-    permission_classes = [IsAdminUser]
-    serializer_class = UserDetailSerializer
-    pagination_class = PageNumberPagination
 
-    @extend_schema(
-    responses={
-        200: UserDetailSerializer(many=True),
-        401: {"description" : "Unauthorized"},
-        500: {"description": "Internal server error"},
-    },
-    methods=["GET"],
-    parameters=[
-        OpenApiParameter(name="page", description="Page number", required=False, type=int),
-    ],
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        paginator = self.pagination_class()
-        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
-        serializer = self.get_serializer(paginated_queryset, many=True)
-        response_data = {
-            'status' : status.HTTP_200_OK,
-            'success' : True,
-            'data' : serializer.data
-            }
-        return paginator.get_paginated_response(response_data)
-        
-@extend_schema(
-    responses={
-        200: UserDetailSerializer,
-        400: {"description": "Bad request"},
-        401: {"description": "Unauthorized"},
-        404: {"description": "Not found"},
-        500: {"description": "Internal server error"}
-    },
-    methods=["GET", "PUT", "PATCH", "DELETE"],
-)
-
-class AdminUserRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    This view authorizes only an admin to perform Read, Update, and Delete operations\n
-    on a user, simply by fetching the user's id.
-    """
-    queryset = User.objects.all()
-    serializer_class = UserDetailSerializer
-    permission_classes = [IsAdminUser]
-    parser_classes = [FormParser, MultiPartParser, JSONParser]
-    lookup_field = 'id'
-
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        response_data = {
-            'status': status.HTTP_200_OK,
-            'success' : True,
-            'message': 'User retrieved successfully',
-            'data': serializer.data
-        }
-        return Response(response_data, status=status.HTTP_200_OK)
-    
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        response_data = {
-            'status': status.HTTP_200_OK,
-            'success' : True,
-            'message': 'User updated successfully',
-            'data': serializer.data
-        }
-        return Response(response_data, status=status.HTTP_200_OK)
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        response_data = {
-            'status': status.HTTP_204_NO_CONTENT,
-            'success' : True,
-            'message': 'User deleted successfully',
-        }
-        return Response(response_data, status=status.HTTP_204_NO_CONTENT)

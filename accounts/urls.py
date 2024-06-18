@@ -12,8 +12,6 @@ from .views import (
     DeliberatePasswordResetAPIView,
     UserDetailAPIView,
     UserProfileUpdateAPIView,
-    UsersListAPIView,
-    AdminUserRUDAPIView,
 )
 
 urlpatterns = [
@@ -29,6 +27,5 @@ urlpatterns = [
     path("deliberate-password-reset", DeliberatePasswordResetAPIView.as_view(), name="deliberate-password-reset"),
     path("user-profile", UserDetailAPIView.as_view(), name="profile-view"),
     path("user-profile-edit", UserProfileUpdateAPIView.as_view(), name="profile-edit-view"),
-    path("admin/users/<int:id>", AdminUserRUDAPIView.as_view(), name="user-admin-rud"),
-    path("admin/users", UsersListAPIView.as_view(), name="users-list"),
+    
 ]

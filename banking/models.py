@@ -25,7 +25,7 @@ class Account(BaseModel):
     def assign_account_number(self, *args, **kwargs):
         if self.user and not self.account_number:
             self.account_number = generate_account_number()
-        super().save(*args, kwargs)
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.account_number} - {self.user.full_name}"
