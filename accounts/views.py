@@ -41,6 +41,11 @@ class UserRegistrationAPIView(generics.GenericAPIView):
 
     serializer_class = UserRegistrationSerializer
     @extend_schema(
+    description= """
+    This endpoint registers a new user based on their full name and email address.\n
+    When a user registers, their data is first saved in the database, and an OTP is sent\n
+    to verify their entered e-mail address.
+    """,
     request=UserRegistrationSerializer,
     responses={
         201: {
@@ -109,12 +114,16 @@ class UserRegistrationAPIView(generics.GenericAPIView):
 class ResendOTPAPIView(generics.GenericAPIView):
     """
     This view resends an account verification OTP, incase a user's OTP expires.\n
-    The user is expected to enter their registered email so they can get a new 4-digit OTP.\n
+    The user is expected to enter their registered email so they can get a new 4-digit OTP.
     """
 
     serializer_class = NewOTPRequestSerializer
     
     @extend_schema(
+    description="""
+    This endpoint resends an account verification OTP, incase a user's OTP expires.\n
+    The user is expected to enter their registered email so they can get a new 4-digit OTP.
+    """,
     request=NewOTPRequestSerializer,
     responses={
         200: {
@@ -220,6 +229,10 @@ class OTPVerificationAPIView(generics.GenericAPIView):
     serializer_class = OTPVerificationSerializer
 
     @extend_schema(
+    description= """
+    This endpoint confirms the OTP sent to a user's email address. If a user's OTP is valid\n
+    and isn't more than 10 minutes of validity, it will be verified, and they will be allowed to proceed with password setup.
+    """,
     request=OTPVerificationSerializer,
     responses={
         200: {
@@ -302,6 +315,12 @@ class PasswordSetUpAPIView(generics.GenericAPIView):
     serializer_class = PasswordSerializer
     
     @extend_schema(
+    description =  """
+    This endpoint allows a user whose OTP has been verified to create a password.\n
+    Once the password is created, their account becomes verified and they become\n
+    a bona fide bank customer. They also get a welcome token of 20,000 naira.\n 
+    Generous! Isn't it?
+    """,
     request=PasswordSerializer,
     responses={
         201: {
@@ -410,6 +429,7 @@ class TransactionPinCreateAPIView(generics.GenericAPIView):
     authentication_classes = [JWTAuthentication]
 
     @extend_schema(
+    description= """This endpoint allows a verified user to create a 4-digit transaction pin.""",
     request=TransactionPinSerializer,
     responses={
         201: {
@@ -460,6 +480,11 @@ class LoginAPIView(generics.GenericAPIView):
     serializer_class = LoginSerializer
 
     @extend_schema(
+    description= """
+    This endpoint allows a user to login based on their e-mail and password. If these login params\n
+    are valid, they will be provided with an access and a refresh token, which will be included\n
+    in the header in every API call that requires authentication.
+    """,
     request=LoginSerializer,
     responses={
         200: {
@@ -539,6 +564,10 @@ class UserLogoutAPIView(generics.GenericAPIView):
         return None
     
     @extend_schema(
+    description=  """
+    This endpoint blacklists the refresh token, consequently preventing a user from generating a new\n
+    access token until they are re-authenticated.
+    """,
     responses={
         200: {"description": "Log out successful"},
         400: {"description": "Log out not successful"}
@@ -581,7 +610,41 @@ class PasswordChangeOTPAPIView(generics.GenericAPIView):
     permission_classes = [AllowAny]
     serializer_class = NewOTPRequestSerializer
     authentication_classes = [JWTAuthentication]
-
+    @extend_schema(
+    description= """
+    This view allows a user to generate a password reset OTP. If the user is authenticated,\n
+    the OTP is sent directly to the user's registered e-mail. Otherwise, they will be required\n
+    to provide to provide their registered e-mail, so they can receive the OTP.
+    """,
+    request=NewOTPRequestSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        500: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+        404: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "integer"},
+                "Success": {"type": "boolean"},
+                "message": {"type": "string"},
+            },
+        },
+    },
+    methods=["POST"],
+    )
     def post(self, request, *args, **kwargs):
         if request.user.is_authenticated:
             email = request.user.email
@@ -637,6 +700,7 @@ class PasswordChangeOTPAPIView(generics.GenericAPIView):
             }
             return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 class ForgottenPasswordResetAPIView(generics.GenericAPIView):
     """
     This view is for users who have forgotten their passwords. They will be prompted to input their\n
@@ -647,6 +711,11 @@ class ForgottenPasswordResetAPIView(generics.GenericAPIView):
     permission_classes = [AllowAny]
 
     @extend_schema(
+    description= """
+    This endpoint is for users who have forgotten their passwords. They will be prompted to input their\n
+    otp, new password, and new password confirmation. Immediately these inputs are verified as valid,\n
+    they will be allowed to login with their new password.
+    """,
     request=PasswordSerializer,
     responses={
         200: {
@@ -735,6 +804,11 @@ class DeliberatePasswordResetAPIView(generics.GenericAPIView):
     authentication_classes = [JWTAuthentication]
 
     @extend_schema(
+    description =  """
+    This endpoint allows only authenticated users to change their password.\n
+    A more nuanced explanation is that a user didn't forget their password, but they feel like changing it for reasons\n
+    best personal to them. Hence, they will be required to provide their old password before they can proceed.
+    """,
     request=DeliberatePasswordChangeSerializer,
     responses={
         200: {
@@ -828,13 +902,14 @@ class UserProfileUpdateAPIView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
     @extend_schema(
-    responses={
+        description =  """This endpoint allows a user to update their information.""",
+        responses={
         200: UserProfileUpdateSerializer,
         400: {"description": "Bad request"},
         401: {"description": "Unauthorized"},
         500: {"description": "Internal server error"}
     },
-    methods=["PUT", "PATCH"]
+        methods=["PUT", "PATCH"]
     )
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -866,6 +941,7 @@ class UserDetailAPIView(generics.GenericAPIView):
         return self.request.user
 
     @extend_schema(
+    description = """This endpoint allows a user to only view their profile.""",
     responses={
         200: UserDetailSerializer,
         400: {"description" : "Bad Request"},

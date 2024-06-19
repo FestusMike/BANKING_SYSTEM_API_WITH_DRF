@@ -12,6 +12,11 @@ from accounts.serializers import UserDetailSerializer
 User = get_user_model()
 
 @extend_schema(
+    description=  """
+    This endpoint allows an admin to fetch a list of all the users in the database, in descending order.\n 
+    To speed up the database query, a query parameter ('page') can be appended to the url and the value\n 
+    can be set to any page number, commonly starting from one.
+    """,
     responses={
         200: UserDetailSerializer(many=True),
         401: {"description" : "Unauthorized"},
@@ -47,6 +52,10 @@ class UsersListAPIView(generics.ListAPIView):
         return paginator.get_paginated_response(response_data)
 
 @extend_schema(
+    description= """
+    This endpoint authorizes only an admin to perform Read, Update, and Delete operations\n
+    on a user, simply by fetching the user's id.
+    """,
     responses={
         200: UserDetailSerializer,
         400: {"description": "Bad request"},

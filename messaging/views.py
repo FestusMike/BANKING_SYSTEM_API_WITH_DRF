@@ -12,11 +12,25 @@ from .serializers import CustomerMessageSerializer
 
 
 class CustomerMessageAPIView(generics.GenericAPIView):
+    """
+    This view enables a user to contact Longman technologies directly. Here, a user is mandated to send\n 
+    a message alongside the request body and they can also decide to send images to corroborate their concern.\n
+    A user can send more than one picture alongside the message, which will be converted to a list\n 
+    before being uploaded to the DB. Upon successfully sending the message, the admin will be alerted and the concern\n
+    will be taken up.
+    """
     permission_classes = [IsAuthenticated]
     serializer_class = CustomerMessageSerializer
     parser_classes = [MultiPartParser, FormParser]
 
     @extend_schema(
+        description = """
+    This endpoint enables a user to contact Longman technologies directly. Here, a user is mandated to send\n 
+    a message alongside the request body and they can also decide to send images to corroborate their concern.\n
+    A user can send more than one picture alongside the message, which will be converted to a list\n 
+    before being uploaded to the DB. Upon successfully sending the message, the admin will be alerted and the concern\n
+    will be taken up
+    """,
         request=CustomerMessageSerializer,
         responses={
             201: CustomerMessageSerializer,
@@ -60,6 +74,9 @@ class CustomerMessageAPIView(generics.GenericAPIView):
         return Response(response_data, status=status.HTTP_201_CREATED)
 
 @extend_schema(
+    description = """
+    This endpoint allows a user to view all the messages they have sent to Longman Technologies
+    """,
     responses={
         200: CustomerMessageSerializer(many=True),
         401: {"description": "Unauthorized"},
@@ -70,6 +87,7 @@ class CustomerMessageAPIView(generics.GenericAPIView):
     ],
     )
 class UserMessagesAPIView(generics.ListAPIView):
+    """This view allows a user to view all the messages they have sent to Longman Technologies"""
     permission_classes = [IsAuthenticated]
     serializer_class = CustomerMessageSerializer
     pagination_class = PageNumberPagination
@@ -92,6 +110,7 @@ class UserMessagesAPIView(generics.ListAPIView):
 
 
 class UserMessageDetailAPIView(generics.RetrieveAPIView):
+    """This view allows a user to fetch a message sent by them by the message's reference_id"""
     permission_classes = [IsAuthenticated]
     serializer_class = CustomerMessageSerializer
     lookup_field = "reference_id"

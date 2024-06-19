@@ -39,6 +39,11 @@ class AccountInfoAPIView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     
     @extend_schema(
+    description= """
+    This endpoint handles provides the details of a verified user based on a valid account number\n 
+    provided in the query parameter. An explicit explanation is that a user has the account number\n
+    of another user but they want to verify their details. This endpoint comes in handy for such use case.
+    """,
     parameters=[
         OpenApiParameter(name="account_number", description="Account Number", required=True, type=str),
     ],
@@ -92,6 +97,11 @@ class TransferAPIView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
+    description="""
+    This endpoint handles funds transfer between two verified users. A user sends funds to a fellow user\n
+    and their accounts both get debited and credited immediately. The two users involved in the transaction also receive\n
+    email alerts immediately after successful transaction.
+    """,
     request=TransferSerializer,
     responses={
         200: {
@@ -216,6 +226,23 @@ class TransferAPIView(generics.GenericAPIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    description="""
+    This endpoint allows a user to fetch all the transactions they are invloved in.\n
+    To speed up database query, a query parameter('page') may be appended to the url\n
+    and the value can be any digit, commonly starting from one.
+    """,
+    responses={
+        200: TransactionSerializer(many=True),
+        500: {"description": "Internal Server Error"},
+    },
+    methods=["GET"],
+    parameters=[
+        OpenApiParameter(
+            name="page", description="Page number", required=False, type=int
+        ),
+    ],
+)
 class UserTransactionListView(generics.ListAPIView):
     """
     This view allows a user to fetch all the transactions they are invloved in.\n
@@ -241,18 +268,6 @@ class UserTransactionListView(generics.ListAPIView):
         transactions = debit_transactions | credit_transactions
         return transactions.order_by("-timestamp")
 
-    @extend_schema(
-        responses={
-        200: TransactionSerializer(many=True),
-        500: {"description": "Internal Server Error"},
-    },
-        methods=["GET"],
-        parameters=[
-        OpenApiParameter(
-            name="page", description="Page number", required=False, type=int
-        ),
-    ],
-    )
     def list(self, request, *args, **kwargs):
         try:
             queryset = self.get_queryset()
@@ -324,6 +339,15 @@ class StatementOfAccountPDFView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
+    description="""
+    This endpoint gives room for a user to generate an account statement which will be immediately\n
+    sent to their email. A user can generate account records for all their transactions or for\n
+    transactions within a specific timeframe. To generate transaction records for a specific timeframe,\n
+    a user can append two query parameters to the url('start_date', 'end_date') with the two parameters\n
+    taking date values in YYYY-MM-DD format.\n 
+    Example: api/v1/statement-of-account?start_date=2024-06-11&end_date=2024-06-11\n
+    To generate account statement for all transactions, no query parameter is needed.
+    """,
     parameters=[
         OpenApiParameter(name="start_date", description="Start date", required=False, type=str),
         OpenApiParameter(name="end_date", description="End date", required=False, type=str),
