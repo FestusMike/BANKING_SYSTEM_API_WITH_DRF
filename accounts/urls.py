@@ -13,6 +13,7 @@ from .views import (
     UserDetailAPIView,
     UserProfileUpdateAPIView,
 )
+from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path("user-registration", UserRegistrationAPIView.as_view(), name="user-registration"),
@@ -27,5 +28,7 @@ urlpatterns = [
     path("deliberate-password-reset", DeliberatePasswordResetAPIView.as_view(), name="deliberate-password-reset"),
     path("user-profile", UserDetailAPIView.as_view(), name="profile-view"),
     path("user-profile-edit", UserProfileUpdateAPIView.as_view(), name="profile-edit-view"),
-    
+    path("token-refresh", TokenRefreshView.as_view(), name="token_refresh"),    
 ]
+
+
