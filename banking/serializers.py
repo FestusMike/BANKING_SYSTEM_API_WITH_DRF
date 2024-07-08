@@ -24,7 +24,16 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Transaction
-        fields = "__all__"
-
+        fields = [
+            "transaction_id",
+            "transaction_type",
+            "transaction_mode",
+            "from_account",
+            "to_account",
+            "amount",
+            "description",
+            "timestamp"
+        ]
+        
 class TransactionImageSerializer(serializers.Serializer):
     pass
