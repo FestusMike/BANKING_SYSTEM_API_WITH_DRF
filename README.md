@@ -183,9 +183,8 @@ The API returns appropriate error messages with suggestions for common typos. Fo
 
 ```
 ## Authentication
-*** This API is designed to be free and accessible to everyone. No API keys or authentication tokens are required. I love free and open-source technologies. Who doesn't? :sunglasses: *** 
+***This API is designed to be free and accessible to everyone. No API keys or authentication tokens are required. I love free and open-source technologies. Who doesn't? :sunglasses:*** 
 
 ## Contact
-***To offer support, comments or suggestions, kindly reach out to me via email: festusmike98@gmail.com***
-***Follow me on [linkedin](https://www.linkedin.com/in/micheal-arifajogun-830378212/).***
+***To offer support, comments or suggestions, kindly reach out to me via email: festusmike98@gmail.com. You can also connect with me on [linkedin](https://www.linkedin.com/in/micheal-arifajogun-830378212/).***
 
