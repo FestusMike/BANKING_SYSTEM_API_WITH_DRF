@@ -6,7 +6,7 @@ The base url for accessing the api is: https://geographicalinfoapiforeveryone.py
 Click [Here](https://geographicalinfoapiforeveryone.pythonanywhere.com/api/v1/docs) to view the documentation.
 
 > [!NOTE]
-> Please be aware that the names of all continents, states or equivalents, and local governments or equivalents, must be capitalized. i.e. The first letter must be in upper case. If you don't get that, don't fret:smile:the API has a spelling suggestion feature that contains that provides a list of possible correct spellings. You like that? I bet you do :rofl:
+> Please be aware that the names of all continents, states or equivalents, and local governments or equivalents, must be capitalized. i.e. The first letter must be in upper case. If you don't get that, don't fret:smile:the API has a spelling suggestion feature that contains that provides a list of possible correct spellings.
 
 + To retrieve basic data of all the continents in the world, send a GET request to: https://geographicalinfoapiforeveryone.pythonanywhere.com/api/v1/continents. Upon a successful request, you'll get a Json response body like the one below:
 
@@ -183,8 +183,9 @@ The API returns appropriate error messages with suggestions for common typos. Fo
 
 ```
 ## Authentication
-***This API is designed to be free and accessible to everyone. No API keys or authentication tokens are required. I love free and open-source technologies. Who doesn't? :sunglasses: *** 
+*** This API is designed to be free and accessible to everyone. No API keys or authentication tokens are required. I love free and open-source technologies. Who doesn't? :sunglasses: *** 
 
 ## Contact
 ***To offer support, comments or suggestions, kindly reach out to me via email: festusmike98@gmail.com***
 ***Follow me on [linkedin](https://www.linkedin.com/in/micheal-arifajogun-830378212/).***
+
